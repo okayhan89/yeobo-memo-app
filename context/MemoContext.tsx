@@ -2,6 +2,7 @@ import React, { createContext, useState, useEffect } from "react";
 import uuid from "react-native-uuid";
 import * as Clipboard from "expo-clipboard";
 import { Alert } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export const MemoContext = createContext();
 
@@ -9,23 +10,46 @@ export const MemoProvider = ({ children }) => {
   const [memos, setMemos] = useState([]);
   const [recentItems, setRecentItems] = useState([]);
 
-  // ⏱ 자동 고정 해제 (3일 이상 지난 메모)
+  // 🔄 메모 불러오기
   useEffect(() => {
-    const now = new Date();
-    setMemos((prev) =>
-      prev.map((memo) => {
-        if (
-          memo.pinned &&
-          memo.updatedAt &&
-          new Date(memo.updatedAt) <
-            new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000)
-        ) {
-          return { ...memo, pinned: false };
+    const loadMemos = async () => {
+      const saved = await AsyncStorage.getItem("memos");
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed)) setMemos(parsed);
+        } catch (e) {
+          console.error("메모 불러오기 실패", e);
         }
-        return memo;
-      })
-    );
+      }
+    };
+    loadMemos();
   }, []);
+
+  // 🔄 최근 항목 불러오기
+  useEffect(() => {
+    const loadRecentItems = async () => {
+      const saved = await AsyncStorage.getItem("recentItems");
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed)) setRecentItems(parsed);
+        } catch (e) {
+          console.error("최근 항목 불러오기 실패", e);
+        }
+      }
+    };
+    loadRecentItems();
+  }, []);
+
+  // 💾 저장
+  useEffect(() => {
+    AsyncStorage.setItem("memos", JSON.stringify(memos));
+  }, [memos]);
+
+  useEffect(() => {
+    AsyncStorage.setItem("recentItems", JSON.stringify(recentItems));
+  }, [recentItems]);
 
   const createMemo = () => {
     const newMemo = {
@@ -61,7 +85,7 @@ export const MemoProvider = ({ children }) => {
     );
     setRecentItems((prev) => {
       if (!prev.includes(itemName)) {
-        return [itemName, ...prev];
+        return [itemName, ...prev.slice(0, 19)];
       }
       return prev;
     });
