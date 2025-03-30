@@ -1,5 +1,4 @@
-// context/MemoContext.tsx
-import React, { createContext, useState } from "react";
+import React, { createContext, useState, useEffect } from "react";
 import uuid from "react-native-uuid";
 import * as Clipboard from "expo-clipboard";
 import { Alert } from "react-native";
@@ -10,14 +9,39 @@ export const MemoProvider = ({ children }) => {
   const [memos, setMemos] = useState([]);
   const [recentItems, setRecentItems] = useState([]);
 
+  // ⏱ 자동 고정 해제 (3일 이상 지난 메모)
+  useEffect(() => {
+    const now = new Date();
+    setMemos((prev) =>
+      prev.map((memo) => {
+        if (
+          memo.pinned &&
+          memo.updatedAt &&
+          new Date(memo.updatedAt) <
+            new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000)
+        ) {
+          return { ...memo, pinned: false };
+        }
+        return memo;
+      })
+    );
+  }, []);
+
   const createMemo = () => {
     const newMemo = {
       id: uuid.v4(),
       title: `새 메모장 ${memos.length + 1}`,
       items: [],
       pinned: false,
+      favorite: false,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     };
     setMemos([...memos, newMemo]);
+  };
+
+  const deleteMemo = (memoId) => {
+    setMemos((prev) => prev.filter((memo) => memo.id !== memoId));
   };
 
   const addItemToMemo = (memoId, itemName) => {
@@ -30,6 +54,7 @@ export const MemoProvider = ({ children }) => {
                 ...memo.items,
                 { id: uuid.v4(), name: itemName, checked: false },
               ],
+              updatedAt: new Date().toISOString(),
             }
           : memo
       )
@@ -51,6 +76,7 @@ export const MemoProvider = ({ children }) => {
           items: memo.items.map((item) =>
             item.id === itemId ? { ...item, checked: !item.checked } : item
           ),
+          updatedAt: new Date().toISOString(),
         };
       })
     );
@@ -60,7 +86,11 @@ export const MemoProvider = ({ children }) => {
     setMemos((prevMemos) =>
       prevMemos.map((memo) =>
         memo.id === memoId
-          ? { ...memo, items: memo.items.filter((item) => item.id !== itemId) }
+          ? {
+              ...memo,
+              items: memo.items.filter((item) => item.id !== itemId),
+              updatedAt: new Date().toISOString(),
+            }
           : memo
       )
     );
@@ -75,6 +105,7 @@ export const MemoProvider = ({ children }) => {
           items: memo.items.map((item) =>
             item.id === itemId ? { ...item, name: newName } : item
           ),
+          updatedAt: new Date().toISOString(),
         };
       })
     );
@@ -83,14 +114,34 @@ export const MemoProvider = ({ children }) => {
   const renameMemo = (memoId, newTitle) => {
     setMemos((prevMemos) =>
       prevMemos.map((memo) =>
-        memo.id === memoId ? { ...memo, title: newTitle } : memo
+        memo.id === memoId
+          ? { ...memo, title: newTitle, updatedAt: new Date().toISOString() }
+          : memo
       )
     );
   };
 
   const pinMemo = (memoId, pinned) => {
     setMemos((prevMemos) =>
-      prevMemos.map((memo) => (memo.id === memoId ? { ...memo, pinned } : memo))
+      prevMemos.map((memo) =>
+        memo.id === memoId
+          ? { ...memo, pinned, updatedAt: new Date().toISOString() }
+          : memo
+      )
+    );
+  };
+
+  const toggleFavorite = (memoId) => {
+    setMemos((prevMemos) =>
+      prevMemos.map((memo) =>
+        memo.id === memoId
+          ? {
+              ...memo,
+              favorite: !memo.favorite,
+              updatedAt: new Date().toISOString(),
+            }
+          : memo
+      )
     );
   };
 
@@ -117,16 +168,16 @@ export const MemoProvider = ({ children }) => {
   return (
     <MemoContext.Provider
       value={{
-        memos: [...memos].sort((a, b) =>
-          b.pinned === a.pinned ? 0 : b.pinned ? 1 : -1
-        ),
+        memos,
         createMemo,
+        deleteMemo,
         addItemToMemo,
         toggleItemChecked,
         deleteItemFromMemo,
         renameItemInMemo,
         renameMemo,
         pinMemo,
+        toggleFavorite,
         recentItems,
         shareMemo,
         getMemoText,
