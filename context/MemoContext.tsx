@@ -4,11 +4,45 @@ import * as Clipboard from "expo-clipboard";
 import { Alert } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-export const MemoContext = createContext();
+export interface MemoItem {
+  id: string;
+  name: string;
+  checked: boolean;
+}
+
+export interface Memo {
+  id: string;
+  title: string;
+  items: MemoItem[];
+  pinned: boolean;
+  favorite: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface MemoContextType {
+  memos: Memo[];
+  createMemo: () => void;
+  deleteMemo: (memoId: string) => void;
+  addItemToMemo: (memoId: string, itemName: string) => void;
+  toggleItemChecked: (memoId: string, itemId: string) => void;
+  deleteItemFromMemo: (memoId: string, itemId: string) => void;
+  renameItemInMemo: (memoId: string, itemId: string, newName: string) => void;
+  renameMemo: (memoId: string, newTitle: string) => void;
+  pinMemo: (memoId: string, pinned: boolean) => void;
+  toggleFavorite: (memoId: string) => void;
+  recentItems: string[];
+  shareMemo: (memoId: string) => void;
+  getMemoText: (memoId: string) => string;
+}
+
+export const MemoContext = createContext<MemoContextType>(
+  {} as MemoContextType
+);
 
 export const MemoProvider = ({ children }) => {
-  const [memos, setMemos] = useState([]);
-  const [recentItems, setRecentItems] = useState([]);
+  const [memos, setMemos] = useState<Memo[]>([]);
+  const [recentItems, setRecentItems] = useState<string[]>([]);
 
   // 🔄 메모 불러오기
   useEffect(() => {
