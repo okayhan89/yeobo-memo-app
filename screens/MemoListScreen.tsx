@@ -546,7 +546,7 @@ const MemoFooter = ({
 
       <View style={styles.inputContainer}>
         <TextInput
-          placeholder="품목을 입력하세요 (또는 URL 붙여넣기)"
+          placeholder="항목을 입력하세요"
           value={input}
           onChangeText={setInput}
           style={styles.input}
@@ -665,6 +665,14 @@ const MemoListScreen = () => {
   const currentMemo = memos.find((memo) => memo.id === memoId);
   const [isFavorite, setIsFavorite] = useState(currentMemo?.favorite || false);
 
+  // 메모가 처음 생성되었을 때 제목 편집 모드로 자동 전환
+  useEffect(() => {
+    if (currentMemo && currentMemo.title === '' && currentMemo.items.length === 0) {
+      setTitleInput('');
+      setEditingTitle(true);
+    }
+  }, [currentMemo]);
+
   const checkedCount = currentMemo?.items.filter((i) => i.checked).length || 0;
   const totalCount = currentMemo?.items.length || 0;
   const percentage =
@@ -735,15 +743,16 @@ const MemoListScreen = () => {
           value={titleInput}
           onChangeText={setTitleInput}
           onSubmitEditing={handleTitleSubmit}
-          onBlur={() => setEditingTitle(false)}
+          onBlur={handleTitleSubmit}
           style={styles.titleInput}
-          placeholder="메모 제목 입력"
+          placeholder="메모 제목을 입력하세요"
           autoFocus
+          selectTextOnFocus={true}
         />
       ) : (
         <View style={styles.titleRow}>
           <TouchableOpacity
-            onLongPress={() => {
+            onPress={() => {
               setTitleInput(currentMemo?.title || "");
               setEditingTitle(true);
             }}
@@ -827,7 +836,7 @@ const MemoListScreen = () => {
         )}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>쇼핑 목록을 추가해보세요.</Text>
+            <Text style={styles.emptyText}>항목을 추가해보세요.</Text>
           </View>
         }
         ListFooterComponent={

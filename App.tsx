@@ -48,7 +48,7 @@ export default function App() {
                 name="Home"
                 component={HomeScreen}
                 options={{
-                  title: "쇼핑 메모",
+                  title: "메모장",
                   headerShown: false,
                 }}
               />
@@ -56,7 +56,7 @@ export default function App() {
                 name="MemoList"
                 component={MemoListScreen}
                 options={{
-                  title: "쇼핑 목록",
+                  title: "메모 내용",
                   headerBackTitle: "뒤로",
                 }}
               />

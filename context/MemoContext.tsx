@@ -22,7 +22,7 @@ export interface Memo {
 
 export interface MemoContextType {
   memos: Memo[];
-  createMemo: () => void;
+  createMemo: () => string;
   deleteMemo: (memoId: string) => void;
   addItemToMemo: (memoId: string, itemName: string) => void;
   toggleItemChecked: (memoId: string, itemId: string) => void;
@@ -34,6 +34,7 @@ export interface MemoContextType {
   recentItems: string[];
   shareMemo: (memoId: string) => void;
   getMemoText: (memoId: string) => string;
+  restoreMemo: (memo: Memo) => void;
 }
 
 export const MemoContext = createContext<MemoContextType>(
@@ -86,9 +87,10 @@ export const MemoProvider = ({ children }) => {
   }, [recentItems]);
 
   const createMemo = () => {
+    const newId = uuid.v4();
     const newMemo = {
-      id: uuid.v4(),
-      title: `새 메모장 ${memos.length + 1}`,
+      id: newId,
+      title: ``,
       items: [],
       pinned: false,
       favorite: false,
@@ -96,10 +98,15 @@ export const MemoProvider = ({ children }) => {
       updatedAt: new Date().toISOString(),
     };
     setMemos([...memos, newMemo]);
+    return newId;
   };
 
   const deleteMemo = (memoId) => {
     setMemos((prev) => prev.filter((memo) => memo.id !== memoId));
+  };
+
+  const restoreMemo = (memo) => {
+    setMemos((prev) => [...prev, memo]);
   };
 
   const addItemToMemo = (memoId, itemName) => {
@@ -239,6 +246,7 @@ export const MemoProvider = ({ children }) => {
         recentItems,
         shareMemo,
         getMemoText,
+        restoreMemo,
       }}
     >
       {children}
