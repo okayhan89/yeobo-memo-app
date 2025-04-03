@@ -858,7 +858,20 @@ const MemoListScreen = () => {
             onChangeText={handleNewItemTextChange}
             onKeyPress={({ nativeEvent }) => {
               if (nativeEvent.key === 'Enter') {
-                processTextToItems(newItemText);
+                // Prevent default Enter behavior
+                if (newItemText.trim()) {
+                  // Store the text in a variable first
+                  const textToProcess = newItemText;
+                  // Clear the input field immediately
+                  setNewItemText("");
+                  // Then process the text
+                  setTimeout(() => {
+                    processTextToItems(textToProcess);
+                  }, 10);
+                } else {
+                  // Just clear if empty
+                  setNewItemText("");
+                }
               }
             }}
             placeholder="새 항목을 입력하세요..."
@@ -867,7 +880,18 @@ const MemoListScreen = () => {
           />
           <TouchableOpacity 
             style={styles.addItemButton}
-            onPress={() => processTextToItems(newItemText)}
+            onPress={() => {
+              if (newItemText.trim()) {
+                // Store text in variable first
+                const textToProcess = newItemText;
+                // Clear input immediately
+                setNewItemText("");
+                // Then process the text
+                setTimeout(() => {
+                  processTextToItems(textToProcess);
+                }, 10);
+              }
+            }}
           >
             <Text style={styles.addItemButtonText}>+</Text>
           </TouchableOpacity>
@@ -905,8 +929,8 @@ const MemoListScreen = () => {
       }
     });
     
-    // 입력 필드 비우기
-    setNewItemText("");
+    // 입력 필드는 이미 Enter 키 처리 시 비워졌으므로 여기서는 제거
+    // setNewItemText("");
     
     // 성공 피드백 - 항목이 추가되었음을 알리는 간단한 알림
     if (Platform.OS === 'android') {
@@ -931,7 +955,9 @@ const MemoListScreen = () => {
                 <Text style={styles.checkmark}>✓</Text>
               </View>
             </TouchableOpacity>
-            <Text style={[styles.itemText, styles.checkedText]}>{item.name}</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.itemText, styles.checkedText]}>{item.name}</Text>
+            </View>
             <TouchableOpacity
               onPress={() => deleteItemFromMemo(memoId, item.id)}
               style={styles.deleteButton}
@@ -1119,7 +1145,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#f8f9fa",
     alignItems: "center",
     justifyContent: "center",
-    marginLeft: 4,
     borderWidth: 1,
     borderColor: "#e9ecef",
   },
@@ -1688,6 +1713,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 6,
+    paddingHorizontal: 8,
+    justifyContent: 'space-between',
   },
   uncheckedItemRow: {
     flexDirection: 'row',
