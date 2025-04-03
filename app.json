@@ -23,6 +23,12 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "bc94272b-4dab-472f-b3c5-d8b31cd21ddc"
+      }
+    },
+    "owner": "hanseungyeab"
   }
 }
