@@ -1,5 +1,11 @@
 // screens/MemoListScreen.tsx
-import React, { useContext, useState, useEffect, useRef, useLayoutEffect } from "react";
+import React, {
+  useContext,
+  useState,
+  useEffect,
+  useRef,
+  useLayoutEffect,
+} from "react";
 import {
   View,
   Text,
@@ -22,9 +28,34 @@ import {
   ScrollView,
 } from "react-native";
 import * as Clipboard from "expo-clipboard";
-import { useRoute, RouteProp, useNavigation, useFocusEffect } from "@react-navigation/native";
+import {
+  useRoute,
+  RouteProp,
+  useNavigation,
+  useFocusEffect,
+} from "@react-navigation/native";
 import { MemoContext, Memo } from "../context/MemoContext";
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
+import { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import {
+  GestureHandlerRootView,
+  Swipeable,
+  PanGestureHandler,
+  State,
+  LongPressGestureHandler,
+} from "react-native-gesture-handler";
+
+// 네비게이션 타입 정의
+type RootStackParamList = {
+  Home: undefined;
+  MemoList: { memoId: string };
+};
+
+type MemoListScreenRouteProp = RouteProp<RootStackParamList, "MemoList">;
+type MemoListScreenNavigationProp = NativeStackNavigationProp<
+  RootStackParamList,
+  "MemoList"
+>;
 
 interface RouteParams {
   memoId: string;
@@ -405,13 +436,13 @@ const MemoFooter = ({
   // 키보드 표시/숨김 이벤트 리스너 추가
   useEffect(() => {
     const keyboardDidShowListener = Keyboard.addListener(
-      'keyboardDidShow',
+      "keyboardDidShow",
       () => {
         setKeyboardHidden(false);
       }
     );
     const keyboardDidHideListener = Keyboard.addListener(
-      'keyboardDidHide',
+      "keyboardDidHide",
       () => {
         setKeyboardHidden(true);
       }
@@ -676,8 +707,8 @@ const MemoFooter = ({
 };
 
 const MemoListScreen = () => {
-  const route = useRoute<RouteProp<Record<string, RouteParams>, string>>();
-  const navigation = useNavigation();
+  const route = useRoute<MemoListScreenRouteProp>();
+  const navigation = useNavigation<MemoListScreenNavigationProp>();
   const { memoId } = route.params;
   const {
     memos,
@@ -697,7 +728,8 @@ const MemoListScreen = () => {
   const [titleInput, setTitleInput] = useState("");
   const [newItemText, setNewItemText] = useState("");
   const [isEditing, setIsEditing] = useState(false);
-  
+  const [filteredSuggestions, setFilteredSuggestions] = useState<string[]>([]);
+
   // 키보드 상태 추적
   const [keyboardHidden, setKeyboardHidden] = useState(false);
 
@@ -705,20 +737,58 @@ const MemoListScreen = () => {
   const [isFavorite, setIsFavorite] = useState(currentMemo?.favorite || false);
 
   // 체크된 항목과 체크되지 않은 항목을 분리
-  const uncheckedItems = currentMemo?.items.filter(item => !item.checked) || [];
-  const checkedItems = currentMemo?.items.filter(item => item.checked) || [];
+  const uncheckedItems =
+    currentMemo?.items.filter((item) => !item.checked) || [];
+  const checkedItems = currentMemo?.items.filter((item) => item.checked) || [];
+
+  // 완료된 항목 표시 여부
+  const [showCompletedItems, setShowCompletedItems] = useState(true);
+
+  // 애니메이션 값 - 새 항목 추가 시 페이드인 효과용
+  const [fadeAnim] = useState(new Animated.Value(1));
 
   // 메모가 처음 생성되었을 때 제목 편집 모드로 자동 전환
   // 한 번만 실행되도록 ref로 상태 추적
   const initialFocusApplied = useRef(false);
   const memoInputRef = useRef<TextInput>(null);
-  
+
+  // 새 항목 텍스트 변경시 추천 항목 필터링
   useEffect(() => {
-    if (currentMemo && 
-        currentMemo.title === '' && 
-        currentMemo.items.length === 0 && 
-        !initialFocusApplied.current) {
-      setTitleInput('');
+    if (newItemText.trim().length > 0) {
+      // 다른 메모에서 사용된 모든 항목명 수집
+      const allItems = new Set<string>();
+
+      // recentItems에서 추가
+      recentItems.forEach((item) => allItems.add(item));
+
+      // 다른 메모들의 항목에서 추가
+      memos.forEach((memo) => {
+        memo.items.forEach((item) => allItems.add(item.name));
+      });
+
+      // 현재 입력 텍스트로 필터링
+      const input = newItemText.toLowerCase().trim();
+      const filtered = Array.from(allItems)
+        .filter(
+          (item) =>
+            item.toLowerCase().includes(input) && item.toLowerCase() !== input
+        )
+        .slice(0, 5); // 최대 5개만 표시
+
+      setFilteredSuggestions(filtered);
+    } else {
+      setFilteredSuggestions([]);
+    }
+  }, [newItemText, recentItems, memos]);
+
+  useEffect(() => {
+    if (
+      currentMemo &&
+      currentMemo.title === "" &&
+      currentMemo.items.length === 0 &&
+      !initialFocusApplied.current
+    ) {
+      setTitleInput("");
       setEditingTitle(true);
       initialFocusApplied.current = true;
     }
@@ -727,13 +797,13 @@ const MemoListScreen = () => {
   // 키보드 표시/숨김 이벤트 리스너
   useEffect(() => {
     const keyboardDidShowListener = Keyboard.addListener(
-      'keyboardDidShow',
+      "keyboardDidShow",
       () => {
         setKeyboardHidden(false);
       }
     );
     const keyboardDidHideListener = Keyboard.addListener(
-      'keyboardDidHide',
+      "keyboardDidHide",
       () => {
         setKeyboardHidden(true);
       }
@@ -760,17 +830,17 @@ const MemoListScreen = () => {
 
   const handleShareMemo = async () => {
     const content = getMemoText(memoId);
-    
+
     try {
       // 클립보드에 복사 (팝업 없이)
       await Clipboard.setStringAsync(content);
-      
+
       // 시스템 공유 다이얼로그만 표시
       await Share.share({
         message: content,
         title: currentMemo?.title || "메모 공유",
       });
-      
+
       // 성공, 취소, 오류 시 어떤 알림이나 모달도 표시하지 않음
     } catch (error) {
       console.error("공유 오류:", error);
@@ -782,7 +852,7 @@ const MemoListScreen = () => {
     // 제목이 비어있든 아니든 모두 저장하고 편집 모드 종료
     renameMemo(memoId, titleInput.trim());
     setEditingTitle(false);
-    
+
     // 키보드가 명시적으로 숨겨진 경우에는 자동 포커스 이동을 하지 않음
     if (!keyboardHidden) {
       // 제목 입력 후 메모 입력 필드로 포커스 이동
@@ -799,143 +869,137 @@ const MemoListScreen = () => {
     // 텍스트 상태만 업데이트하고 항목은 생성하지 않음
     setNewItemText(text);
   };
-  
+
   // 메모 입력 완료 처리 - 포커스를 잃거나 특정 조건에서 호출
   const handleNewItemSubmit = () => {
     if (!newItemText.trim()) return;
-    
-    const lines = newItemText.trim().split('\n');
-    
+
+    const lines = newItemText.trim().split("\n");
+
     // 빈 줄 제거
-    const filteredLines = lines.filter(line => line.trim() !== '');
-    
+    const filteredLines = lines.filter((line) => line.trim() !== "");
+
     // 기존 항목 모두 제거 (체크된 항목은 유지)
-    const itemsToKeep = currentMemo?.items.filter(item => item.checked) || [];
-    
+    const itemsToKeep = currentMemo?.items.filter((item) => item.checked) || [];
+
     // 새 메모 아이템 구성
     let updatedMemo = { ...currentMemo, items: itemsToKeep };
-    
+
     // 각 줄을 새 항목으로 추가
-    filteredLines.forEach(line => {
+    filteredLines.forEach((line) => {
       if (line.trim()) {
         addItemToMemo(memoId, line.trim());
       }
     });
-    
+
     // 편집 모드 종료
     setIsEditing(false);
   };
 
-  // 새 줄이 추가될 때 자동으로 체크박스를 표시하고 항목으로 변환하는 처리
-  const renderMemoInput = () => {
-    return (
-      <View style={styles.memoInputWithCheckboxes}>
-        {/* 체크되지 않은 항목들 표시 */}
-        {uncheckedItems.map((item) => (
-          <View key={item.id} style={styles.itemRow}>
-            <TouchableOpacity
-              onPress={() => toggleItemChecked(memoId, item.id)}
-              style={styles.checkboxTouchable}
-            >
-              <View style={styles.checkbox}>
-                {item.checked && <Text style={styles.checkmark}>✓</Text>}
-              </View>
-            </TouchableOpacity>
-            <Text style={styles.itemText}>{item.name}</Text>
-          </View>
-        ))}
-        
-        {/* 새 항목 입력 필드 */}
-        <View style={styles.newItemInputRow}>
-          <View style={styles.checkboxTouchable}>
-            <View style={styles.checkbox}></View>
-          </View>
-          <TextInput
-            ref={memoInputRef}
-            style={styles.itemInputField}
-            multiline
-            value={newItemText}
-            onChangeText={handleNewItemTextChange}
-            onKeyPress={({ nativeEvent }) => {
-              if (nativeEvent.key === 'Enter') {
-                // Prevent default Enter behavior
-                if (newItemText.trim()) {
-                  // Store the text in a variable first
-                  const textToProcess = newItemText;
-                  // Clear the input field immediately
-                  setNewItemText("");
-                  // Then process the text
-                  setTimeout(() => {
-                    processTextToItems(textToProcess);
-                  }, 10);
-                } else {
-                  // Just clear if empty
-                  setNewItemText("");
-                }
-              }
-            }}
-            placeholder="새 항목을 입력하세요..."
-            autoCapitalize="none"
-            blurOnSubmit={false}
-          />
-          <TouchableOpacity 
-            style={styles.addItemButton}
-            onPress={() => {
-              if (newItemText.trim()) {
-                // Store text in variable first
-                const textToProcess = newItemText;
-                // Clear input immediately
-                setNewItemText("");
-                // Then process the text
-                setTimeout(() => {
-                  processTextToItems(textToProcess);
-                }, 10);
-              }
-            }}
-          >
-            <Text style={styles.addItemButtonText}>+</Text>
-          </TouchableOpacity>
-        </View>
-        
-        {/* 항목 추가 가이드 */}
-        <View style={styles.addItemGuide}>
-          <Text style={styles.addItemGuideText}>
-            항목 입력 후 <Text style={styles.addItemGuideHighlight}>Enter 키</Text>를 누르거나 <Text style={styles.addItemGuideHighlight}>+ 버튼</Text>을 탭하여 항목 추가
-          </Text>
-        </View>
-      </View>
-    );
+  // 새 항목 추가 시 애니메이션
+  const fadeIn = () => {
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 300,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  // 새 항목 추가 시 직접 항목을 추가하고 애니메이션 적용
+  const addNewItem = (text: string) => {
+    if (!text.trim()) return;
+
+    // 입력 필드 비우기
+    setNewItemText("");
+
+    // fadeAnim 값을 0으로 리셋
+    fadeAnim.setValue(0);
+
+    // 직접 항목 추가
+    addItemToMemo(memoId, text.trim());
+
+    // 성공 피드백
+    if (Platform.OS === "android") {
+      ToastAndroid.show("항목이 추가되었습니다", ToastAndroid.SHORT);
+    }
+
+    // 애니메이션 실행
+    fadeIn();
+
+    // 키보드 유지 (사용자가 연속해서 항목을 추가할 수 있도록)
   };
 
   // 텍스트를 항목으로 처리하는 함수
   const processTextToItems = (text: string) => {
     if (!text.trim()) return;
-    
-    const lines = text.trim().split('\n');
-    
+
+    const lines = text.trim().split("\n");
+
     // 빈 줄 제거
-    const filteredLines = lines.filter(line => line.trim() !== '');
-    
-    // 새로운 항목만 추가하고 기존 항목은 유지
-    filteredLines.forEach((line, index) => {
+    const filteredLines = lines.filter((line) => line.trim() !== "");
+
+    // 하나의 항목만 있는 경우 (간단한 경우)
+    if (filteredLines.length === 1) {
+      const itemText = filteredLines[0].trim();
       // 이미 존재하는 항목인지 확인
       const alreadyExists = currentMemo?.items.some(
-        item => item.name === line.trim() && !item.checked
+        (item) => item.name === itemText && !item.checked
       );
-      
+
       // 존재하지 않는 항목만 추가
-      if (!alreadyExists && line.trim()) {
-        addItemToMemo(memoId, line.trim());
+      if (!alreadyExists) {
+        addItemToMemo(memoId, itemText);
+
+        // 애니메이션 실행
+        fadeAnim.setValue(0);
+        fadeIn();
+
+        // 성공 피드백
+        if (Platform.OS === "android") {
+          ToastAndroid.show("항목이 추가되었습니다", ToastAndroid.SHORT);
+        }
+      }
+
+      // 추천 항목 초기화
+      setFilteredSuggestions([]);
+      return;
+    }
+
+    // 여러 줄의 항목이 있는 경우
+    let addedCount = 0;
+    filteredLines.forEach((line) => {
+      const itemText = line.trim();
+      if (!itemText) return;
+
+      // 이미 존재하는 항목인지 확인
+      const alreadyExists = currentMemo?.items.some(
+        (item) => item.name === itemText && !item.checked
+      );
+
+      // 존재하지 않는 항목만 추가
+      if (!alreadyExists) {
+        addItemToMemo(memoId, itemText);
+        addedCount++;
       }
     });
-    
-    // 입력 필드는 이미 Enter 키 처리 시 비워졌으므로 여기서는 제거
-    // setNewItemText("");
-    
+
     // 성공 피드백 - 항목이 추가되었음을 알리는 간단한 알림
-    if (Platform.OS === 'android') {
-      ToastAndroid.show('항목이 추가되었습니다', ToastAndroid.SHORT);
+    if (addedCount > 0) {
+      // 애니메이션 실행
+      fadeAnim.setValue(0);
+      if (Platform.OS === "android") {
+        ToastAndroid.show(
+          `${addedCount}개 항목이 추가되었습니다`,
+          ToastAndroid.SHORT
+        );
+      }
+
+      // 키보드를 내립니다
+      Keyboard.dismiss();
     }
+
+    // 추천 항목 초기화
+    setFilteredSuggestions([]);
   };
 
   // 체크된 항목 렌더링
@@ -945,7 +1009,7 @@ const MemoListScreen = () => {
     return (
       <View style={styles.checkedItemsContainer}>
         <Text style={styles.checkedItemsTitle}>완료된 항목</Text>
-        {checkedItems.map((item) => (
+        {checkedItems.map((item, index) => (
           <View key={item.id} style={styles.checkedItemRow}>
             <TouchableOpacity
               onPress={() => toggleItemChecked(memoId, item.id)}
@@ -956,7 +1020,9 @@ const MemoListScreen = () => {
               </View>
             </TouchableOpacity>
             <View style={{ flex: 1 }}>
-              <Text style={[styles.itemText, styles.checkedText]}>{item.name}</Text>
+              <Text style={[styles.itemText, styles.checkedText]}>
+                {item.name}
+              </Text>
             </View>
             <TouchableOpacity
               onPress={() => deleteItemFromMemo(memoId, item.id)}
@@ -974,7 +1040,11 @@ const MemoListScreen = () => {
   useFocusEffect(
     React.useCallback(() => {
       const onBackPress = () => {
-        if (currentMemo && (!currentMemo.title || currentMemo.title.trim() === '') && (!currentMemo.items || currentMemo.items.length === 0)) {
+        if (
+          currentMemo &&
+          (!currentMemo.title || currentMemo.title.trim() === "") &&
+          (!currentMemo.items || currentMemo.items.length === 0)
+        ) {
           // 제목과 항목이 모두 없는 빈 메모인 경우 삭제
           deleteMemo(memoId);
           console.log("빈 메모가 삭제되었습니다:", memoId);
@@ -983,19 +1053,118 @@ const MemoListScreen = () => {
       };
 
       // 안드로이드 하드웨어 뒤로가기 버튼 처리
-      BackHandler.addEventListener('hardwareBackPress', onBackPress);
-      
+      BackHandler.addEventListener("hardwareBackPress", onBackPress);
+
       // 화면 이탈 감지
-      const unsubscribe = navigation.addListener('beforeRemove', () => {
+      const unsubscribe = navigation.addListener("beforeRemove", () => {
         onBackPress();
       });
 
       return () => {
-        BackHandler.removeEventListener('hardwareBackPress', onBackPress);
+        BackHandler.removeEventListener("hardwareBackPress", onBackPress);
         unsubscribe();
       };
     }, [currentMemo, memoId, deleteMemo, navigation])
   );
+
+  // 항목 편집 상태 관리
+  const [editingItemId, setEditingItemId] = useState<string | null>(null);
+  const [editingItemText, setEditingItemText] = useState("");
+
+  // 항목 체크 상태 변경 - 체크된 항목을 Completed 섹션 최상단에 배치
+  const handleItemCheck = (itemId) => {
+    // 먼저 원래 toggleItemChecked 함수를 호출하여 항목 체크 상태 변경
+    toggleItemChecked(memoId, itemId);
+
+    // 체크된 항목을 Completed 섹션의 맨 위로 이동하기 위한 추가 로직
+    // (MemoContext 내부 구현에 따라 이 코드는 불필요할 수 있음)
+    if (Platform.OS === "android") {
+      ToastAndroid.show(
+        "항목이 완료 목록으로 이동했습니다",
+        ToastAndroid.SHORT
+      );
+    }
+  };
+
+  // 항목 편집 시작
+  const startItemEdit = (item) => {
+    setEditingItemId(item.id);
+    setEditingItemText(item.name);
+  };
+
+  // 항목 편집 완료
+  const finishItemEdit = () => {
+    if (editingItemId && editingItemText.trim()) {
+      renameItemInMemo(memoId, editingItemId, editingItemText.trim());
+    }
+    setEditingItemId(null);
+    setEditingItemText("");
+  };
+
+  // 드래그 시작 핸들러
+  const onLongPress = (index, item) => {
+    // 진동 피드백
+    if (Platform.OS === "android") {
+      ToastAndroid.show(
+        "항목을 길게 눌러 편집할 수 있습니다",
+        ToastAndroid.SHORT
+      );
+    }
+
+    // 편집 모드 시작
+    startItemEdit(item);
+  };
+
+  // 단순한 항목 컴포넌트
+  const TouchableItem = ({ item, index, isChecked = false }) => {
+    return (
+      <TouchableOpacity
+        style={[isChecked ? styles.checkedItemRow : styles.itemRow]}
+        onPress={() => startItemEdit(item)}
+        onLongPress={() => onLongPress(index, item)}
+        delayLongPress={500}
+        activeOpacity={0.7}
+      >
+        <TouchableOpacity
+          onPress={() =>
+            isChecked
+              ? toggleItemChecked(memoId, item.id)
+              : handleItemCheck(item.id)
+          }
+          style={styles.checkboxTouchable}
+        >
+          <View style={[styles.checkbox, isChecked && styles.checkboxChecked]}>
+            {isChecked && <Text style={styles.checkmark}>✓</Text>}
+          </View>
+        </TouchableOpacity>
+
+        {editingItemId === item.id ? (
+          <TextInput
+            style={[styles.itemText, styles.itemEditInput]}
+            value={editingItemText}
+            onChangeText={setEditingItemText}
+            onSubmitEditing={finishItemEdit}
+            onBlur={finishItemEdit}
+            autoFocus
+            blurOnSubmit
+          />
+        ) : (
+          <Text style={[styles.itemText, isChecked && styles.checkedText]}>
+            {item.name}
+          </Text>
+        )}
+
+        {isChecked && (
+          <TouchableOpacity
+            onPress={() => deleteItemFromMemo(memoId, item.id)}
+            style={styles.deleteButton}
+          >
+            <Text style={styles.deleteText}>✕</Text>
+          </TouchableOpacity>
+        )}
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
@@ -1009,7 +1178,7 @@ const MemoListScreen = () => {
                 onSubmitEditing={handleTitleSubmit}
                 onBlur={handleTitleSubmit}
                 style={styles.titleInput}
-                placeholder="제목을 입력하세요"
+                placeholder="Enter title"
                 autoFocus
                 blurOnSubmit={true}
               />
@@ -1026,13 +1195,15 @@ const MemoListScreen = () => {
                 </Text>
               </TouchableOpacity>
             )}
-            
+
             <View style={styles.titleActions}>
               <TouchableOpacity
                 onPress={handleToggleFavorite}
                 style={styles.titleActionButton}
               >
-                <Text style={styles.titleActionIcon}>{isFavorite ? "⭐" : "☆"}</Text>
+                <Text style={styles.titleActionIcon}>
+                  {isFavorite ? "⭐" : "☆"}
+                </Text>
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={handleShareMemo}
@@ -1043,8 +1214,8 @@ const MemoListScreen = () => {
             </View>
           </View>
         </View>
-        
-        <KeyboardAwareScrollView 
+
+        <KeyboardAwareScrollView
           style={styles.mainScrollView}
           contentContainerStyle={styles.mainScrollContentContainer}
           showsVerticalScrollIndicator={true}
@@ -1054,20 +1225,124 @@ const MemoListScreen = () => {
           extraScrollHeight={50}
           scrollEnabled={true}
           bounces={true}
-          bouncesZoom={true}
-          alwaysBounceVertical={true}
+          bouncesZoom={false}
+          alwaysBounceVertical={false}
           automaticallyAdjustContentInsets={false}
-          maintainVisibleContentPosition={{
-            minIndexForVisible: 0,
-            autoscrollToTopThreshold: 10
-          }}
+          keyboardOpeningTime={0}
         >
-          <View style={styles.memoContainer}>
-            {renderMemoInput()}
+          {/* 새 항목 입력 영역을 상단에 배치 */}
+          <View style={styles.newItemContainer}>
+            <View style={styles.newItemInputRow}>
+              <TouchableOpacity style={styles.checkboxTouchable}>
+                <View style={styles.checkbox}></View>
+              </TouchableOpacity>
+              <TextInput
+                ref={memoInputRef}
+                style={styles.itemInputField}
+                multiline
+                value={newItemText}
+                onChangeText={handleNewItemTextChange}
+                onKeyPress={({ nativeEvent }) => {
+                  if (nativeEvent.key === "Enter") {
+                    // Enter 키 처리
+                    if (newItemText.trim()) {
+                      addNewItem(newItemText);
+                    } else {
+                      setNewItemText("");
+                    }
+                  }
+                }}
+                placeholder="Add new task..."
+                autoCapitalize="none"
+                blurOnSubmit={false}
+              />
+              <TouchableOpacity
+                style={styles.addItemButton}
+                onPress={() => {
+                  if (newItemText.trim()) {
+                    addNewItem(newItemText);
+                  }
+                }}
+              >
+                <Text style={styles.addItemButtonText}>+</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* 자동완성 제안 영역 */}
+            {filteredSuggestions.length > 0 && (
+              <View style={styles.suggestionsContainer}>
+                {filteredSuggestions.map((suggestion, index) => (
+                  <TouchableOpacity
+                    key={index}
+                    style={styles.suggestionItem}
+                    onPress={() => {
+                      setNewItemText(suggestion);
+                      addNewItem(suggestion);
+                    }}
+                  >
+                    <Text style={styles.suggestionText}>{suggestion}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
           </View>
-          
-          {/* 완료된 항목 영역 */}
-          {renderCheckedItems()}
+
+          {/* 체크되지 않은 항목 영역 */}
+          {uncheckedItems.length > 0 ? (
+            <>
+              <View style={styles.headerContainer}>
+                <View style={styles.completedHeaderContent}>
+                  <Text style={styles.sectionHeader}>Tasks</Text>
+                  <Text style={styles.itemCount}>{uncheckedItems.length}</Text>
+                </View>
+              </View>
+              {uncheckedItems.map((item, index) => (
+                <TouchableItem
+                  key={item.id}
+                  item={item}
+                  index={index}
+                  isChecked={false}
+                />
+              ))}
+            </>
+          ) : (
+            <View style={styles.emptyItemsMessage}>
+              <Text style={styles.emptyItemsText}>
+                No tasks yet. Add a new task above.
+              </Text>
+            </View>
+          )}
+
+          {/* 완료된 항목 영역 - 아코디언 형태 */}
+          {checkedItems.length > 0 && (
+            <>
+              <TouchableOpacity
+                style={styles.completedHeaderContainer}
+                onPress={() => setShowCompletedItems(!showCompletedItems)}
+              >
+                <View style={styles.completedHeaderContent}>
+                  <Text style={styles.sectionHeader}>Completed</Text>
+                  <Text style={styles.itemCount}>{checkedItems.length}</Text>
+                </View>
+                <Text style={styles.toggleIcon}>
+                  {showCompletedItems ? "▼" : "▶"}
+                </Text>
+              </TouchableOpacity>
+
+              {showCompletedItems && (
+                <View style={styles.completedItemsContainer}>
+                  {checkedItems.map((item, index) => (
+                    <TouchableItem
+                      key={item.id}
+                      item={item}
+                      index={index}
+                      isChecked={true}
+                    />
+                  ))}
+                </View>
+              )}
+            </>
+          )}
         </KeyboardAwareScrollView>
       </View>
     </TouchableWithoutFeedback>
@@ -1083,14 +1358,16 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   itemRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 12,
+    paddingHorizontal: 14,
     borderBottomWidth: 1,
     borderBottomColor: "#f1f3f5",
     backgroundColor: "#fff",
-    marginVertical: 3,
-    borderRadius: 6,
+    marginVertical: 5,
+    marginHorizontal: 10,
+    borderRadius: 10,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
@@ -1105,6 +1382,7 @@ const styles = StyleSheet.create({
   },
   checkboxTouchable: {
     padding: 3,
+    marginRight: 15,
   },
   itemTextContainer: {
     flex: 1,
@@ -1184,11 +1462,10 @@ const styles = StyleSheet.create({
   },
   itemEditInput: {
     flex: 1,
-    fontSize: 15,
     borderBottomWidth: 1,
     borderBottomColor: "#4dabf7",
-    marginRight: 8,
-    padding: 4,
+    paddingVertical: 4,
+    fontSize: 16,
   },
   inputContainer: {
     flexDirection: "row",
@@ -1236,17 +1513,14 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   suggestionItem: {
-    backgroundColor: "#e9ecef",
-    paddingHorizontal: 12,
     paddingVertical: 8,
-    borderRadius: 16,
-    margin: 4,
-    borderWidth: 1,
-    borderColor: "#dee2e6",
+    paddingHorizontal: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f0f0f0",
   },
   suggestionText: {
-    color: "#495057",
-    fontSize: 14,
+    fontSize: 16,
+    color: "#555",
   },
   listContentContainer: {
     paddingBottom: 16,
@@ -1627,17 +1901,17 @@ const styles = StyleSheet.create({
     elevation: 1,
   },
   titleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
   },
   titleInput: {
     fontSize: 18,
-    fontWeight: 'bold',
-    color: '#343a40',
+    fontWeight: "bold",
+    color: "#343a40",
     padding: 4,
     borderBottomWidth: 1,
-    borderBottomColor: '#ced4da',
+    borderBottomColor: "#ced4da",
     flex: 1,
   },
   titleTextContainer: {
@@ -1646,18 +1920,18 @@ const styles = StyleSheet.create({
   },
   titleText: {
     fontSize: 18,
-    fontWeight: 'bold',
-    color: '#343a40',
+    fontWeight: "bold",
+    color: "#343a40",
     borderBottomWidth: 1,
-    borderBottomColor: '#e9ecef',
+    borderBottomColor: "#e9ecef",
     paddingBottom: 4,
   },
   editIcon: {
     fontSize: 16,
-    color: '#868e96',
+    color: "#868e96",
   },
   titleActions: {
-    flexDirection: 'row',
+    flexDirection: "row",
     marginLeft: 8,
   },
   titleActionButton: {
@@ -1665,7 +1939,7 @@ const styles = StyleSheet.create({
   },
   titleActionIcon: {
     fontSize: 18,
-    color: '#495057',
+    color: "#495057",
   },
   scrollContainer: {
     flex: 1,
@@ -1675,7 +1949,7 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
   },
   memoContainer: {
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     borderRadius: 10,
     padding: 12,
     marginBottom: 16,
@@ -1684,7 +1958,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 1,
     elevation: 1,
-    width: '100%',
+    width: "100%",
   },
   memoInputContainer: {
     flex: 1,
@@ -1692,58 +1966,67 @@ const styles = StyleSheet.create({
   memoInput: {
     flex: 1,
     fontSize: 16,
-    color: '#212529',
+    color: "#212529",
     minHeight: 100,
-    textAlignVertical: 'top',
+    textAlignVertical: "top",
     paddingVertical: 4,
   },
   checkedItemsContainer: {
-    backgroundColor: '#f8f9fa',
+    backgroundColor: "#f8f9fa",
     borderRadius: 10,
     padding: 12,
     marginBottom: 16,
   },
   checkedItemsTitle: {
     fontSize: 14,
-    color: '#868e96',
+    color: "#868e96",
     marginBottom: 8,
-    fontWeight: '500',
+    fontWeight: "500",
   },
   checkedItemRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 6,
-    paddingHorizontal: 8,
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    backgroundColor: "#f8f9fa",
+    marginVertical: 3,
+    marginHorizontal: 10,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: "#e9ecef",
+    minHeight: 40,
+    justifyContent: "space-between",
+    width: "100%",
   },
   uncheckedItemRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     paddingVertical: 6,
   },
   memoInputWithCheckboxes: {
     flex: 1,
-    width: '100%',
+    width: "100%",
   },
   itemInputField: {
     flex: 1,
     fontSize: 16,
-    color: '#212529',
+    color: "#212529",
     paddingVertical: 4,
     paddingHorizontal: 8,
+    marginLeft: 7,
   },
   newItemInputRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#f8f9fa',
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#f8f9fa",
     borderRadius: 10,
     marginTop: 8,
     marginBottom: 4,
-    paddingVertical: 8,
-    paddingHorizontal: 4,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
     minHeight: 50,
     borderWidth: 1,
-    borderColor: '#e9ecef',
+    borderColor: "#e9ecef",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
@@ -1754,9 +2037,9 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#4dabf7',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "#4dabf7",
+    justifyContent: "center",
+    alignItems: "center",
     marginRight: 8,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
@@ -1765,43 +2048,202 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   addItemButtonText: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 24,
-    fontWeight: 'bold',
+    fontWeight: "bold",
   },
   addItemGuide: {
     padding: 10,
-    backgroundColor: '#e7f5ff',
+    backgroundColor: "#e7f5ff",
     borderRadius: 8,
     marginTop: 12,
     marginBottom: 8,
-    alignItems: 'center',
+    alignItems: "center",
   },
   addItemGuideText: {
-    color: '#495057',
+    color: "#495057",
     fontSize: 13,
-    textAlign: 'center',
+    textAlign: "center",
   },
   addItemGuideHighlight: {
-    fontWeight: 'bold',
-    color: '#339af0',
+    fontWeight: "bold",
+    color: "#339af0",
   },
   contentContainer: {
     flex: 1,
   },
   itemsScrollView: {
-    maxHeight: 300,
     marginBottom: 8,
   },
   checkedItemsScrollView: {
-    maxHeight: 200,
+    marginBottom: 8,
   },
   mainScrollView: {
     flex: 1,
-    width: '100%',
+    width: "100%",
   },
   mainScrollContentContainer: {
     flexGrow: 1,
-    paddingBottom: 80, // 하단 여백 추가
+    paddingBottom: 100, // 하단 여백 증가
+  },
+  newItemContainer: {
+    backgroundColor: "#fff",
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 1,
+    elevation: 1,
+  },
+  emptyItemsMessage: {
+    padding: 20,
+    alignItems: "center",
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    marginVertical: 12,
+  },
+  emptyItemsText: {
+    fontSize: 16,
+    color: "#868e96",
+    textAlign: "center",
+  },
+  headerContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: 10,
+    backgroundColor: "#fff",
+    borderRadius: 10,
+    marginTop: 10,
+    marginBottom: 6,
+    marginHorizontal: 10,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 1,
+    elevation: 1,
+  },
+  sectionHeader: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#343a40",
+  },
+  itemCount: {
+    fontSize: 14,
+    color: "#868e96",
+    fontWeight: "500",
+    marginLeft: 8,
+  },
+  completedHeaderContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: 10,
+    backgroundColor: "#f8f9fa",
+    borderRadius: 10,
+    marginTop: 10,
+    marginBottom: 6,
+    marginHorizontal: 10,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 1,
+    elevation: 1,
+  },
+  completedHeaderContent: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  toggleIcon: {
+    fontSize: 18,
+    color: "#495057",
+    fontWeight: "bold",
+  },
+  completedItemsContainer: {
+    overflow: "hidden",
+  },
+  extraFeaturesContainer: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    paddingVertical: 10,
+    borderTopWidth: 1,
+    borderTopColor: "#e9ecef",
+    marginTop: 10,
+  },
+  featureButton: {
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 8,
+    borderRadius: 8,
+  },
+  featureIcon: {
+    fontSize: 20,
+    marginBottom: 5,
+  },
+  featureText: {
+    fontSize: 12,
+    color: "#495057",
+  },
+  swipeActionLeft: {
+    backgroundColor: "#4dabf7",
+    padding: 10,
+    borderRadius: 10,
+    alignItems: "center",
+  },
+  swipeActionRight: {
+    backgroundColor: "#ff6b6b",
+    padding: 10,
+    borderRadius: 10,
+    alignItems: "center",
+  },
+  swipeActionText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "bold",
+  },
+  draggingItem: {
+    backgroundColor: "#e7f5ff",
+    borderWidth: 2,
+    borderColor: "#4dabf7",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.27,
+    shadowRadius: 4.65,
+    elevation: 6,
+    transform: [{ scale: 1.02 }],
+  },
+  dragHandleContainer: {
+    flexDirection: "column",
+    alignItems: "center",
+    marginLeft: "auto",
+    marginRight: 8,
+  },
+  dragArrow: {
+    padding: 4,
+    backgroundColor: "rgba(73, 143, 225, 0.1)",
+    borderRadius: 15,
+    width: 30,
+    height: 30,
+    justifyContent: "center",
+    alignItems: "center",
+    marginVertical: 2,
+  },
+  dragArrowText: {
+    fontSize: 16,
+    color: "#4dabf7",
+    fontWeight: "bold",
+  },
+  suggestionsContainer: {
+    backgroundColor: "#fff",
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 1,
+    elevation: 1,
   },
 });

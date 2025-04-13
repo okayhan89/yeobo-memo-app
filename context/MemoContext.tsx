@@ -41,7 +41,9 @@ export const MemoContext = createContext<MemoContextType>(
   {} as MemoContextType
 );
 
-export const MemoProvider = ({ children }) => {
+export const MemoProvider: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => {
   const [memos, setMemos] = useState<Memo[]>([]);
   const [recentItems, setRecentItems] = useState<string[]>([]);
 
@@ -116,8 +118,8 @@ export const MemoProvider = ({ children }) => {
           ? {
               ...memo,
               items: [
-                ...memo.items,
                 { id: uuid.v4(), name: itemName, checked: false },
+                ...memo.items,
               ],
               updatedAt: new Date().toISOString(),
             }
@@ -136,13 +138,44 @@ export const MemoProvider = ({ children }) => {
     setMemos((prevMemos) =>
       prevMemos.map((memo) => {
         if (memo.id !== memoId) return memo;
-        return {
-          ...memo,
-          items: memo.items.map((item) =>
-            item.id === itemId ? { ...item, checked: !item.checked } : item
-          ),
-          updatedAt: new Date().toISOString(),
-        };
+
+        // 해당 항목과 그 상태를 찾기
+        const targetItem = memo.items.find((item) => item.id === itemId);
+        if (!targetItem) return memo;
+
+        // 항목의 새로운 체크 상태 (토글 후)
+        const newCheckedState = !targetItem.checked;
+
+        if (newCheckedState) {
+          // 항목이 체크되는 경우 (미완료 -> 완료)
+          // 1. 해당 항목을 기존 목록에서 제거
+          const otherItems = memo.items.filter((item) => item.id !== itemId);
+          // 2. 체크된 항목들과 체크되지 않은 항목들 분리
+          const checkedItems = otherItems.filter((item) => item.checked);
+          const uncheckedItems = otherItems.filter((item) => !item.checked);
+          // 3. 체크된 항목의 맨 앞에 새로 체크된 항목 추가
+          const updatedItems = [
+            ...uncheckedItems,
+            { ...targetItem, checked: true },
+            ...checkedItems,
+          ];
+
+          return {
+            ...memo,
+            items: updatedItems,
+            updatedAt: new Date().toISOString(),
+          };
+        } else {
+          // 항목이 체크 해제되는 경우 (완료 -> 미완료)
+          // 위치를 변경할 필요 없이 상태만 업데이트
+          return {
+            ...memo,
+            items: memo.items.map((item) =>
+              item.id === itemId ? { ...item, checked: false } : item
+            ),
+            updatedAt: new Date().toISOString(),
+          };
+        }
       })
     );
   };

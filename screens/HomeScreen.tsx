@@ -14,6 +14,18 @@ import {
 import { useNavigation } from "@react-navigation/native";
 import { MemoContext } from "../context/MemoContext";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { NativeStackNavigationProp } from "@react-navigation/native-stack";
+
+// 네비게이션 타입 정의
+type RootStackParamList = {
+  Home: undefined;
+  MemoList: { memoId: string };
+};
+
+type HomeScreenNavigationProp = NativeStackNavigationProp<
+  RootStackParamList,
+  "Home"
+>;
 
 const SEARCH_HISTORY_KEY = "searchHistory";
 const { width } = Dimensions.get("window");
@@ -33,10 +45,7 @@ const MemoCard = ({ item, navigation, toggleFavorite, deleteMemo }) => {
           <Text style={styles.favoriteIcon}>{item.favorite ? "⭐" : "☆"}</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity
-          onPress={deleteMemo}
-          style={styles.closeButton}
-        >
+        <TouchableOpacity onPress={deleteMemo} style={styles.closeButton}>
           <Text style={styles.closeButtonText}>✕</Text>
         </TouchableOpacity>
       </View>
@@ -49,16 +58,16 @@ const MemoCard = ({ item, navigation, toggleFavorite, deleteMemo }) => {
           <Text style={styles.memoTitle} numberOfLines={1} ellipsizeMode="tail">
             {item.title || "제목 없음"}
           </Text>
-          
+
           {item.items && item.items.length > 0 ? (
             <View style={styles.memoContentContainer}>
               <View style={styles.itemsPreview}>
                 {item.items.slice(0, 3).map((listItem, index) => (
-                  <Text 
+                  <Text
                     key={index}
                     style={[
-                      styles.previewItem, 
-                      listItem.checked && styles.checkedItem
+                      styles.previewItem,
+                      listItem.checked && styles.checkedItem,
                     ]}
                     numberOfLines={1}
                   >
@@ -86,7 +95,7 @@ const MemoCard = ({ item, navigation, toggleFavorite, deleteMemo }) => {
 };
 
 const HomeScreen = () => {
-  const navigation = useNavigation();
+  const navigation = useNavigation<HomeScreenNavigationProp>();
   const { memos, createMemo, toggleFavorite, deleteMemo, restoreMemo } =
     useContext(MemoContext);
   const [search, setSearch] = useState("");
@@ -112,14 +121,14 @@ const HomeScreen = () => {
     // Reset and show immediately
     undoOpacity.setValue(0);
     setShowUndo(true);
-    
+
     // Fade in quickly
     Animated.timing(undoOpacity, {
       toValue: 1,
       duration: 200, // Quick fade in
       useNativeDriver: true,
     }).start();
-    
+
     // Set up fade out timer
     return setTimeout(() => {
       Animated.timing(undoOpacity, {
@@ -152,22 +161,20 @@ const HomeScreen = () => {
   }, [deletedMemos]);
 
   const handleDeleteMemo = (memo) => {
-    // 삭제된 메모 구조를 더 명확하게 저장합니다
+    // 삭제된 메모 원본 그대로 보존합니다
     const memoToStore = {
       ...memo,
-      // 삭제하기 전의 원래 제목을 보존합니다
-      originalTitle: typeof memo.title === 'string' ? memo.title : "",
-      // 삭제된 메모 표시는 새로운 삭제 타이틀로 설정합니다
-      deletedTitle: `삭제된 메모 (${new Date().toLocaleTimeString()})`,
+      // 삭제 시간 정보만 추가합니다
+      deletedAt: new Date().toISOString(),
     };
-    
+
     // First update the UI state to show the toast immediately
     setShowUndo(true);
-    
+
     // Then update the data state
     const newDeletedMemos = [...deletedMemos, memoToStore];
     setDeletedMemos(newDeletedMemos.slice(0, 10)); // Keep only the 10 most recent deletions
-    
+
     // Finally delete the memo
     deleteMemo(memo.id);
   };
@@ -175,16 +182,16 @@ const HomeScreen = () => {
   // Quick undo from toast - only restores the most recent memo
   const handleQuickUndo = () => {
     if (deletedMemos.length > 0) {
-      // Restore only the most recently deleted memo
-      const memoToRestore = {
-        ...deletedMemos[0],
-        // 원래 제목으로 복원
-        title: deletedMemos[0].originalTitle || ""
-      };
-      restoreMemo(memoToRestore);
-      
+      // 가장 최근에 삭제된 메모
+      const memoToRestore = deletedMemos[0];
+
+      // 삭제 시 추가된 속성을 제외하고 원본 메모 구조 그대로 복원
+      const { deletedAt, ...originalMemo } = memoToRestore;
+
+      restoreMemo(originalMemo);
+
       // Remove it from the deleted memos array
-      setDeletedMemos(prev => prev.slice(1));
+      setDeletedMemos((prev) => prev.slice(1));
       setShowUndo(false);
     }
   };
@@ -192,17 +199,17 @@ const HomeScreen = () => {
   // Full undo from action menu - can restore any deleted memo
   const handleRestoreMemo = (index) => {
     if (deletedMemos.length > index) {
-      // Restore the selected memo
-      const memoToRestore = {
-        ...deletedMemos[index],
-        // 원래 제목으로 복원
-        title: deletedMemos[index].originalTitle || ""
-      };
-      restoreMemo(memoToRestore);
-      
+      // 선택한 메모
+      const memoToRestore = deletedMemos[index];
+
+      // 삭제 시 추가된 속성을 제외하고 원본 메모 구조 그대로 복원
+      const { deletedAt, ...originalMemo } = memoToRestore;
+
+      restoreMemo(originalMemo);
+
       // Remove it from the deleted memos array
-      setDeletedMemos(prev => prev.filter((_, i) => i !== index));
-      
+      setDeletedMemos((prev) => prev.filter((_, i) => i !== index));
+
       // Close menu if no more items
       if (deletedMemos.length <= 1) {
         setShowActionMenu(false);
@@ -267,25 +274,33 @@ const HomeScreen = () => {
             onPress={() => setFilter("all")}
             style={[
               styles.segmentButton,
-              filter === "all" && styles.activeSegment
+              filter === "all" && styles.activeSegment,
             ]}
           >
-            <Text style={[
-              styles.segmentText,
-              filter === "all" && styles.activeSegmentText
-            ]}>전체</Text>
+            <Text
+              style={[
+                styles.segmentText,
+                filter === "all" && styles.activeSegmentText,
+              ]}
+            >
+              전체
+            </Text>
           </TouchableOpacity>
           <TouchableOpacity
             onPress={() => setFilter("favorite")}
             style={[
               styles.segmentButton,
-              filter === "favorite" && styles.activeSegment
+              filter === "favorite" && styles.activeSegment,
             ]}
           >
-            <Text style={[
-              styles.segmentText,
-              filter === "favorite" && styles.activeSegmentText
-            ]}>⭐</Text>
+            <Text
+              style={[
+                styles.segmentText,
+                filter === "favorite" && styles.activeSegmentText,
+              ]}
+            >
+              ⭐
+            </Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -327,9 +342,7 @@ const HomeScreen = () => {
             {filter === "favorite" ? (
               <>
                 <Text style={styles.emptyIcon}>⭐</Text>
-                <Text style={styles.emptyText}>
-                  즐겨찾기된 메모가 없습니다
-                </Text>
+                <Text style={styles.emptyText}>즐겨찾기된 메모가 없습니다</Text>
                 <Text style={styles.emptySubtext}>
                   메모의 ⭐ 버튼을 눌러 즐겨찾기를 추가해보세요
                 </Text>
@@ -347,12 +360,7 @@ const HomeScreen = () => {
 
       {/* Undo Toast Notification - only for most recent deletion */}
       {showUndo && (
-        <Animated.View 
-          style={[
-            styles.undoContainer,
-            { opacity: undoOpacity }
-          ]}
-        >
+        <Animated.View style={[styles.undoContainer, { opacity: undoOpacity }]}>
           <Text style={styles.undoText}>메모가 삭제되었습니다</Text>
           <TouchableOpacity onPress={handleQuickUndo} style={styles.undoButton}>
             <Text style={styles.undoButtonText}>되돌리기</Text>
@@ -363,13 +371,13 @@ const HomeScreen = () => {
       {/* Action Menu - includes multi-item undo functionality */}
       {showActionMenu && (
         <>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.menuOverlay}
             activeOpacity={1}
             onPress={() => setShowActionMenu(false)}
           />
           <View style={styles.actionMenuContainer}>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.actionButton}
               onPress={() => {
                 handleCreateMemo();
@@ -385,7 +393,9 @@ const HomeScreen = () => {
               <>
                 <View style={styles.actionDivider} />
                 <View style={styles.actionHeaderContainer}>
-                  <Text style={styles.actionSectionTitle}>최근 삭제된 메모</Text>
+                  <Text style={styles.actionSectionTitle}>
+                    최근 삭제된 메모
+                  </Text>
                   <Text style={styles.actionSectionCount}>
                     {deletedMemos.length}/10
                   </Text>
@@ -393,33 +403,41 @@ const HomeScreen = () => {
                 <Text style={styles.actionSectionDescription}>
                   최대 10개까지 복구 가능합니다
                 </Text>
-                <ScrollView 
-                  style={[styles.deletedMemosScrollBase, deletedMemos.length > 3 ? styles.deletedMemosScroll : null]}
+                <ScrollView
+                  style={[
+                    styles.deletedMemosScrollBase,
+                    deletedMemos.length > 3 ? styles.deletedMemosScroll : null,
+                  ]}
                   showsVerticalScrollIndicator={false}
                 >
                   {deletedMemos.map((memo, index) => {
                     return (
-                    <TouchableOpacity 
-                      key={memo.id}
-                      style={styles.actionButton}
-                      onPress={() => handleRestoreMemo(index)}
-                    >
-                      <Text style={styles.actionButtonIcon}>🔄</Text>
-                      <View style={styles.actionButtonContent}>
-                        <Text 
-                          style={[
-                            styles.actionButtonText, 
-                            (!memo.originalTitle || memo.originalTitle.trim() === '') && {fontStyle: 'italic', color: '#adb5bd'}
-                          ]} 
-                          numberOfLines={1}
-                        >
-                          {memo.originalTitle ? memo.originalTitle : "(제목 없음)"}
-                        </Text>
-                        <Text style={styles.actionButtonSubtext}>
-                          {new Date(memo.updatedAt || memo.createdAt).toLocaleTimeString()}
-                        </Text>
-                      </View>
-                    </TouchableOpacity>
+                      <TouchableOpacity
+                        key={memo.id}
+                        style={styles.actionButton}
+                        onPress={() => handleRestoreMemo(index)}
+                      >
+                        <Text style={styles.actionButtonIcon}>🔄</Text>
+                        <View style={styles.actionButtonContent}>
+                          <Text
+                            style={[
+                              styles.actionButtonText,
+                              (!memo.title || memo.title.trim() === "") && {
+                                fontStyle: "italic",
+                                color: "#adb5bd",
+                              },
+                            ]}
+                            numberOfLines={1}
+                          >
+                            {memo.title ? memo.title : "(제목 없음)"}
+                          </Text>
+                          <Text style={styles.actionButtonSubtext}>
+                            {memo.deletedAt
+                              ? new Date(memo.deletedAt).toLocaleTimeString()
+                              : new Date().toLocaleTimeString()}
+                          </Text>
+                        </View>
+                      </TouchableOpacity>
                     );
                   })}
                 </ScrollView>
@@ -430,8 +448,8 @@ const HomeScreen = () => {
       )}
 
       {/* Main Action Button */}
-      <TouchableOpacity 
-        style={styles.addButton} 
+      <TouchableOpacity
+        style={styles.addButton}
         onPress={handleCreateMemo}
         onLongPress={toggleActionMenu}
       >
@@ -451,10 +469,10 @@ const styles = StyleSheet.create({
   },
   searchContainer: {
     marginBottom: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    position: 'relative',
-    backgroundColor: '#fff',
+    flexDirection: "row",
+    alignItems: "center",
+    position: "relative",
+    backgroundColor: "#fff",
     borderRadius: 12,
     borderWidth: 1,
     borderColor: "#dee2e6",
@@ -465,11 +483,11 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   searchIcon: {
-    position: 'absolute',
+    position: "absolute",
     left: 16,
     fontSize: 16,
     zIndex: 1,
-    color: '#adb5bd',
+    color: "#adb5bd",
   },
   searchInput: {
     flex: 1,
@@ -477,29 +495,29 @@ const styles = StyleSheet.create({
     paddingLeft: 42,
     fontSize: 15,
     borderRightWidth: 1,
-    borderRightColor: '#f1f3f5',
+    borderRightColor: "#f1f3f5",
   },
   segmentedControl: {
-    flexDirection: 'row',
+    flexDirection: "row",
     paddingLeft: 8,
     paddingRight: 8,
   },
   segmentButton: {
     paddingVertical: 8,
     paddingHorizontal: 10,
-    alignItems: 'center',
+    alignItems: "center",
   },
   activeSegment: {
     borderBottomWidth: 2,
-    borderBottomColor: '#4dabf7',
+    borderBottomColor: "#4dabf7",
   },
   segmentText: {
     fontSize: 13,
-    color: '#868e96',
+    color: "#868e96",
   },
   activeSegmentText: {
-    fontWeight: '600',
-    color: '#343a40',
+    fontWeight: "600",
+    color: "#343a40",
   },
   historyContainer: {
     marginBottom: 16,
@@ -635,26 +653,26 @@ const styles = StyleSheet.create({
   },
   previewItem: {
     fontSize: 12,
-    color: '#495057',
+    color: "#495057",
     marginBottom: 1,
   },
   checkedItem: {
-    textDecorationLine: 'line-through',
-    color: '#adb5bd',
+    textDecorationLine: "line-through",
+    color: "#adb5bd",
   },
   moreItems: {
     fontSize: 11,
-    color: '#adb5bd',
-    fontStyle: 'italic',
+    color: "#adb5bd",
+    fontStyle: "italic",
     marginTop: 2,
   },
   menuOverlay: {
-    position: 'absolute',
+    position: "absolute",
     top: 0,
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'transparent',
+    backgroundColor: "transparent",
     zIndex: 1,
   },
   actionMenuContainer: {
@@ -784,4 +802,3 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
 });
-
