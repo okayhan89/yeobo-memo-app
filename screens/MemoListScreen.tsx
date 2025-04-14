@@ -1073,6 +1073,13 @@ const MemoListScreen = () => {
 
   // 항목 체크 상태 변경 - 체크된 항목을 Completed 섹션 최상단에 배치
   const handleItemCheck = (itemId) => {
+    // 편집 중인 항목이면 편집 모드를 종료
+    if (editingItemId === itemId) {
+      setEditingItemId(null);
+      setEditingItemText("");
+      Keyboard.dismiss();
+    }
+
     // 먼저 원래 toggleItemChecked 함수를 호출하여 항목 체크 상태 변경
     toggleItemChecked(memoId, itemId);
 
@@ -1126,11 +1133,19 @@ const MemoListScreen = () => {
         activeOpacity={0.7}
       >
         <TouchableOpacity
-          onPress={() =>
+          onPress={() => {
+            // 편집 중인 항목이면 편집 모드를 종료
+            if (editingItemId === item.id) {
+              setEditingItemId(null);
+              setEditingItemText("");
+              Keyboard.dismiss();
+            }
+
+            // 체크 상태 변경
             isChecked
               ? toggleItemChecked(memoId, item.id)
-              : handleItemCheck(item.id)
-          }
+              : handleItemCheck(item.id);
+          }}
           style={styles.checkboxTouchable}
         >
           <View style={[styles.checkbox, isChecked && styles.checkboxChecked]}>
@@ -1146,7 +1161,8 @@ const MemoListScreen = () => {
             onSubmitEditing={finishItemEdit}
             onBlur={finishItemEdit}
             autoFocus
-            blurOnSubmit
+            blurOnSubmit={true}
+            keyboardType="default"
           />
         ) : (
           <Text style={[styles.itemText, isChecked && styles.checkedText]}>
