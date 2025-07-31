@@ -617,6 +617,7 @@ const MemoFooter = ({
       <View style={styles.inputContainer}>
         <TextInput
           placeholder="항목을 입력하세요"
+          placeholderTextColor="#adb5bd"
           value={input}
           onChangeText={setInput}
           style={styles.input}
@@ -1249,6 +1250,7 @@ const MemoListScreen = () => {
                 onBlur={handleTitleSubmit}
                 style={styles.titleInput}
                 placeholder="Enter title"
+                placeholderTextColor="#adb5bd"
                 autoFocus
                 blurOnSubmit={true}
               />
@@ -1269,17 +1271,23 @@ const MemoListScreen = () => {
             <View style={styles.titleActions}>
               <TouchableOpacity
                 onPress={handleToggleFavorite}
-                style={styles.titleActionButton}
+                style={[
+                  styles.titleActionButton,
+                  isFavorite && styles.favoriteActiveButton
+                ]}
               >
-                <Text style={styles.titleActionIcon}>
-                  {isFavorite ? "⭐" : "☆"}
+                <Text style={[
+                  styles.titleActionIcon,
+                  isFavorite && styles.favoriteActiveIcon
+                ]}>
+                  {isFavorite ? "★" : "☆"}
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={handleShareMemo}
                 style={styles.titleActionButton}
               >
-                <Text style={styles.titleActionIcon}>⇧</Text>
+                <Text style={styles.titleActionIcon}>↗</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -1325,6 +1333,7 @@ const MemoListScreen = () => {
                   }
                 }}
                 placeholder="Add new task..."
+                placeholderTextColor="#adb5bd"
                 autoCapitalize="none"
                 autoFocus={false}
                 blurOnSubmit={false}
@@ -1428,27 +1437,26 @@ export default MemoListScreen;
 
 const styles = StyleSheet.create({
   container: {
-    padding: 10,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 8,
     backgroundColor: "#f8f9fa",
     flex: 1,
   },
   itemRow: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: "#f1f3f5",
+    paddingVertical: 14,
+    paddingHorizontal: 16,
     backgroundColor: "#fff",
-    marginVertical: 5,
-    marginHorizontal: 10,
-    borderRadius: 10,
+    marginVertical: 2,
+    borderRadius: 12,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 1,
-    elevation: 1,
-    minHeight: 40,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 3,
+    elevation: 2,
+    minHeight: 48,
   },
   itemContainer: {
     flexDirection: "row",
@@ -1456,8 +1464,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
   },
   checkboxTouchable: {
-    padding: 3,
-    marginRight: 15,
+    padding: 4,
+    marginRight: 12,
   },
   itemTextContainer: {
     flex: 1,
@@ -1465,17 +1473,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
   },
   checkbox: {
-    width: 20,
-    height: 20,
-    borderRadius: 5,
+    width: 22,
+    height: 22,
+    borderRadius: 6,
     borderWidth: 2,
-    borderColor: "#ced4da",
+    borderColor: "#dee2e6",
     alignItems: "center",
     justifyContent: "center",
   },
   checkboxChecked: {
-    backgroundColor: "#4dabf7",
-    borderColor: "#4dabf7",
+    backgroundColor: "#339af0",
+    borderColor: "#339af0",
   },
   checkmark: {
     color: "#fff",
@@ -1485,6 +1493,8 @@ const styles = StyleSheet.create({
   itemText: {
     fontSize: 16,
     color: "#212529",
+    flex: 1,
+    lineHeight: 22,
   },
   checkedText: {
     textDecorationLine: "line-through",
@@ -1588,14 +1598,18 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   suggestionItem: {
-    paddingVertical: 8,
-    paddingHorizontal: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
     borderBottomWidth: 1,
-    borderBottomColor: "#f0f0f0",
+    borderBottomColor: "#f1f3f5",
+    backgroundColor: "#f8f9fa",
+    marginVertical: 1,
+    borderRadius: 8,
   },
   suggestionText: {
-    fontSize: 16,
-    color: "#555",
+    fontSize: 15,
+    color: "#495057",
+    fontWeight: "500",
   },
   listContentContainer: {
     paddingBottom: 16,
@@ -1965,15 +1979,16 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
   },
   titleContainer: {
-    padding: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
     backgroundColor: "#fff",
-    borderRadius: 10,
-    marginBottom: 16,
+    borderRadius: 14,
+    marginBottom: 12,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 1,
-    elevation: 1,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 3,
+    elevation: 2,
   },
   titleRow: {
     flexDirection: "row",
@@ -1981,25 +1996,24 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   titleInput: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: "#343a40",
-    padding: 4,
-    borderBottomWidth: 1,
-    borderBottomColor: "#ced4da",
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#212529",
+    padding: 6,
+    borderBottomWidth: 2,
+    borderBottomColor: "#339af0",
     flex: 1,
+    letterSpacing: -0.3,
   },
   titleTextContainer: {
     padding: 4,
     flex: 1,
   },
   titleText: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: "#343a40",
-    borderBottomWidth: 1,
-    borderBottomColor: "#e9ecef",
-    paddingBottom: 4,
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#212529",
+    letterSpacing: -0.3,
   },
   editIcon: {
     fontSize: 16,
@@ -2010,11 +2024,29 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   titleActionButton: {
-    padding: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 10,
+    backgroundColor: "#f8f9fa",
+    marginLeft: 6,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 1,
+    elevation: 1,
   },
   titleActionIcon: {
     fontSize: 18,
     color: "#495057",
+    fontWeight: "600",
+  },
+  favoriteActiveButton: {
+    backgroundColor: "#fff3cd",
+    borderWidth: 1,
+    borderColor: "#ffc107",
+  },
+  favoriteActiveIcon: {
+    color: "#ff8f00",
   },
   scrollContainer: {
     flex: 1,
@@ -2062,17 +2094,16 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     paddingVertical: 12,
-    paddingHorizontal: 14,
+    paddingHorizontal: 16,
     backgroundColor: "#f8f9fa",
-    marginVertical: 5,
-    marginHorizontal: 10,
-    borderRadius: 10,
+    marginVertical: 2,
+    borderRadius: 12,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 1,
+    shadowOpacity: 0.04,
+    shadowRadius: 2,
     elevation: 1,
-    minHeight: 40,
+    minHeight: 44,
   },
   uncheckedItemRow: {
     flexDirection: "row",
@@ -2087,46 +2118,42 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 16,
     color: "#212529",
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    marginLeft: 7,
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+    lineHeight: 22,
   },
   newItemInputRow: {
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "#f8f9fa",
-    borderRadius: 10,
-    marginTop: 8,
-    marginBottom: 4,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    minHeight: 50,
-    borderWidth: 1,
-    borderColor: "#e9ecef",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 1,
-    elevation: 1,
+    borderRadius: 12,
+    marginTop: 6,
+    marginBottom: 2,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    minHeight: 52,
+    borderWidth: 1.5,
+    borderColor: "#dee2e6",
   },
   addItemButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: "#4dabf7",
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: "#339af0",
     justifyContent: "center",
     alignItems: "center",
-    marginRight: 8,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 1,
-    elevation: 2,
+    marginLeft: 8,
+    shadowColor: "#339af0",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 2,
+    elevation: 3,
   },
   addItemButtonText: {
     color: "#fff",
-    fontSize: 24,
-    fontWeight: "bold",
+    fontSize: 20,
+    fontWeight: "600",
+    lineHeight: 20,
   },
   addItemGuide: {
     padding: 10,
@@ -2164,68 +2191,84 @@ const styles = StyleSheet.create({
   },
   newItemContainer: {
     backgroundColor: "#fff",
-    borderRadius: 10,
-    padding: 12,
-    marginBottom: 16,
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginBottom: 12,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 1,
-    elevation: 1,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 3,
+    elevation: 2,
   },
   emptyItemsMessage: {
-    padding: 20,
+    paddingVertical: 24,
+    paddingHorizontal: 20,
     alignItems: "center",
     backgroundColor: "#fff",
-    borderRadius: 12,
-    marginVertical: 12,
+    borderRadius: 14,
+    marginVertical: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 2,
+    elevation: 1,
   },
   emptyItemsText: {
-    fontSize: 16,
-    color: "#868e96",
+    fontSize: 15,
+    color: "#6c757d",
     textAlign: "center",
+    fontWeight: "500",
+    lineHeight: 22,
   },
   headerContainer: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    padding: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     backgroundColor: "#fff",
-    borderRadius: 10,
-    marginTop: 10,
-    marginBottom: 6,
-    marginHorizontal: 10,
+    borderRadius: 12,
+    marginTop: 8,
+    marginBottom: 4,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 1,
+    shadowOpacity: 0.06,
+    shadowRadius: 2,
     elevation: 1,
   },
   sectionHeader: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#343a40",
+    fontSize: 17,
+    fontWeight: "700",
+    color: "#212529",
+    letterSpacing: -0.2,
   },
   itemCount: {
-    fontSize: 14,
-    color: "#868e96",
-    fontWeight: "500",
-    marginLeft: 8,
+    fontSize: 13,
+    color: "#6c757d",
+    fontWeight: "600",
+    marginLeft: 6,
+    backgroundColor: "#e9ecef",
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+    minWidth: 24,
+    textAlign: "center",
   },
   completedHeaderContainer: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    padding: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     backgroundColor: "#f8f9fa",
-    borderRadius: 10,
-    marginTop: 10,
-    marginBottom: 6,
-    marginHorizontal: 10,
+    borderRadius: 12,
+    marginTop: 16,
+    marginBottom: 4,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 1,
+    shadowOpacity: 0.04,
+    shadowRadius: 2,
     elevation: 1,
   },
   completedHeaderContent: {
@@ -2313,32 +2356,33 @@ const styles = StyleSheet.create({
   },
   suggestionsContainer: {
     backgroundColor: "#fff",
-    borderRadius: 10,
-    padding: 12,
-    marginBottom: 16,
+    borderRadius: 12,
+    padding: 8,
+    marginTop: 6,
+    marginBottom: 8,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 1,
-    elevation: 1,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 3,
+    elevation: 2,
   },
   swipeDeleteAction: {
     backgroundColor: "#ff6b6b",
     justifyContent: "center",
     alignItems: "center",
     width: 80,
-    marginVertical: 5,
-    marginHorizontal: 10,
-    borderRadius: 10,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 1,
-    elevation: 1,
+    marginVertical: 2,
+    borderRadius: 12,
+    shadowColor: "#ff6b6b",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+    elevation: 3,
   },
   swipeDeleteText: {
     color: "#fff",
-    fontSize: 14,
-    fontWeight: "bold",
+    fontSize: 13,
+    fontWeight: "700",
+    letterSpacing: -0.1,
   },
 });

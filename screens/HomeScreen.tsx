@@ -29,32 +29,16 @@ type HomeScreenNavigationProp = NativeStackNavigationProp<
 
 const SEARCH_HISTORY_KEY = "searchHistory";
 const { width } = Dimensions.get("window");
-const CARD_MARGIN = 8;
-const COLUMN_COUNT = 2;
-const CARD_WIDTH =
-  (width - 32 - (COLUMN_COUNT - 1) * CARD_MARGIN) / COLUMN_COUNT;
 
 const MemoCard = ({ item, navigation, toggleFavorite, deleteMemo }) => {
   return (
-    <View style={styles.memoCard}>
-      <View style={styles.cardHeader}>
-        <TouchableOpacity
-          onPress={() => toggleFavorite(item.id)}
-          style={styles.favoriteButton}
-        >
-          <Text style={styles.favoriteIcon}>{item.favorite ? "⭐" : "☆"}</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity onPress={deleteMemo} style={styles.closeButton}>
-          <Text style={styles.closeButtonText}>✕</Text>
-        </TouchableOpacity>
-      </View>
-
-      <TouchableOpacity
-        style={styles.cardContent}
-        onPress={() => navigation.navigate("MemoList", { memoId: item.id })}
-      >
-        <View>
+    <TouchableOpacity
+      style={styles.memoCard}
+      onPress={() => navigation.navigate("MemoList", { memoId: item.id })}
+      activeOpacity={0.7}
+    >
+      <View style={styles.cardContent}>
+        <View style={styles.textContent}>
           <Text style={styles.memoTitle} numberOfLines={1} ellipsizeMode="tail">
             {item.title || "제목 없음"}
           </Text>
@@ -62,7 +46,7 @@ const MemoCard = ({ item, navigation, toggleFavorite, deleteMemo }) => {
           {item.items && item.items.length > 0 ? (
             <View style={styles.memoContentContainer}>
               <View style={styles.itemsPreview}>
-                {item.items.slice(0, 3).map((listItem, index) => (
+                {item.items.slice(0, 4).map((listItem, index) => (
                   <Text
                     key={index}
                     style={[
@@ -74,9 +58,9 @@ const MemoCard = ({ item, navigation, toggleFavorite, deleteMemo }) => {
                     • {listItem.name}
                   </Text>
                 ))}
-                {item.items.length > 3 && (
+                {item.items.length > 4 && (
                   <Text style={styles.moreItems}>
-                    외 {item.items.length - 3}개 항목...
+                    +{item.items.length - 4}개 더...
                   </Text>
                 )}
               </View>
@@ -84,13 +68,38 @@ const MemoCard = ({ item, navigation, toggleFavorite, deleteMemo }) => {
           ) : (
             <Text style={styles.memoSummary}>내용 없음</Text>
           )}
+
+          <Text style={styles.memoDate}>
+            {new Date(item.updatedAt || item.createdAt).toLocaleDateString()}
+          </Text>
         </View>
 
-        <Text style={styles.memoDate}>
-          {new Date(item.updatedAt || item.createdAt).toLocaleDateString()}
-        </Text>
-      </TouchableOpacity>
-    </View>
+        <View style={styles.cardActions}>
+          <TouchableOpacity
+            onPress={(e) => {
+              e.stopPropagation();
+              toggleFavorite(item.id);
+            }}
+            style={[
+              styles.favoriteButton,
+              item.favorite && styles.favoriteActiveButton
+            ]}
+          >
+            <Text style={[styles.favoriteIcon, item.favorite && styles.favoriteActiveIcon]}>{item.favorite ? "★" : "☆"}</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            onPress={(e) => {
+              e.stopPropagation();
+              deleteMemo();
+            }} 
+            style={styles.closeButton}
+          >
+            <Text style={styles.closeButtonText}>✕</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </TouchableOpacity>
   );
 };
 
@@ -260,16 +269,32 @@ const HomeScreen = () => {
 
   return (
     <View style={styles.container}>
-      <View style={styles.searchContainer}>
-        <Text style={styles.searchIcon}>🔍</Text>
-        <TextInput
-          placeholder="메모 검색"
-          value={search}
-          onChangeText={setSearch}
-          onSubmitEditing={() => updateSearchHistory(search)}
-          style={styles.searchInput}
-        />
-        <View style={styles.segmentedControl}>
+      {/* 헤더 영역 */}
+      <View style={styles.headerSection}>
+        <View style={styles.searchContainer}>
+          <Text style={styles.searchIcon}>⌕</Text>
+          <TextInput
+            placeholder="search"
+            placeholderTextColor="#adb5bd"
+            value={search}
+            onChangeText={setSearch}
+            onSubmitEditing={() => updateSearchHistory(search)}
+            selectTextOnFocus={true}
+            style={styles.searchInput}
+          />
+          {search.length > 0 && (
+            <TouchableOpacity
+              onPress={() => setSearch("")}
+              style={styles.searchClearButton}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Text style={styles.searchClearText}>✕</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+        
+        {/* 필터 탭 */}
+        <View style={styles.filterContainer}>
           <TouchableOpacity
             onPress={() => setFilter("all")}
             style={[
@@ -297,66 +322,85 @@ const HomeScreen = () => {
               style={[
                 styles.segmentText,
                 filter === "favorite" && styles.activeSegmentText,
+                filter === "favorite" && styles.favoriteSegmentActive,
               ]}
             >
-              ⭐
+              ★
             </Text>
           </TouchableOpacity>
         </View>
       </View>
 
+      {/* 검색 히스토리 */}
       {searchHistory.length > 0 && (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.historyContainer}
-          contentContainerStyle={styles.historyContentContainer}
-        >
-          {searchHistory.map((term, index) => (
-            <TouchableOpacity
-              key={index}
-              onPress={() => setSearch(term)}
-              style={styles.historyItem}
-            >
-              <Text style={styles.historyText}>{term}</Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
+        <View style={styles.historySection}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.historyContainer}
+            contentContainerStyle={styles.historyContentContainer}
+          >
+            {searchHistory.map((term, index) => (
+              <View key={index} style={styles.historyItemContainer}>
+                <TouchableOpacity
+                  onPress={() => setSearch(term)}
+                  style={styles.historyItem}
+                >
+                  <Text style={styles.historyText}>{term}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => {
+                    const newHistory = searchHistory.filter((_, i) => i !== index);
+                    setSearchHistory(newHistory);
+                    AsyncStorage.setItem(SEARCH_HISTORY_KEY, JSON.stringify(newHistory));
+                  }}
+                  style={styles.historyDeleteButton}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Text style={styles.historyDeleteText}>✕</Text>
+                </TouchableOpacity>
+              </View>
+            ))}
+          </ScrollView>
+        </View>
       )}
 
-      <FlatList
-        data={filteredMemos}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <MemoCard
-            item={item}
-            navigation={navigation}
-            toggleFavorite={toggleFavorite}
-            deleteMemo={() => handleDeleteMemo(item)}
-          />
-        )}
-        numColumns={2}
-        columnWrapperStyle={styles.gridRow}
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            {filter === "favorite" ? (
-              <>
-                <Text style={styles.emptyIcon}>⭐</Text>
-                <Text style={styles.emptyText}>즐겨찾기된 메모가 없습니다</Text>
-                <Text style={styles.emptySubtext}>
-                  메모의 ⭐ 버튼을 눌러 즐겨찾기를 추가해보세요
-                </Text>
-              </>
-            ) : (
-              <>
-                <Text style={styles.emptyIcon}>📝</Text>
-                <Text style={styles.emptyText}>메모장을 추가해보세요!</Text>
-              </>
-            )}
-          </View>
-        }
-        contentContainerStyle={styles.listContentContainer}
-      />
+      {/* 메모 리스트 */}
+      <View style={styles.contentSection}>
+        <FlatList
+          data={filteredMemos}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item }) => (
+            <MemoCard
+              item={item}
+              navigation={navigation}
+              toggleFavorite={toggleFavorite}
+              deleteMemo={() => handleDeleteMemo(item)}
+            />
+          )}
+          numColumns={1}
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              {filter === "favorite" ? (
+                <>
+                  <Text style={styles.emptyIcon}>★</Text>
+                  <Text style={styles.emptyText}>즐겨찾기된 메모가 없습니다</Text>
+                  <Text style={styles.emptySubtext}>
+                    메모의 ★ 버튼을 눌러 즐겨찾기를 추가해보세요
+                  </Text>
+                </>
+              ) : (
+                <>
+                  <Text style={styles.emptyIcon}>✏</Text>
+                  <Text style={styles.emptyText}>메모장을 추가해보세요!</Text>
+                </>
+              )}
+            </View>
+          }
+          contentContainerStyle={styles.listContentContainer}
+          showsVerticalScrollIndicator={false}
+        />
+      </View>
 
       {/* Undo Toast Notification - only for most recent deletion */}
       {showUndo && (
@@ -464,178 +508,283 @@ export default HomeScreen;
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 0,
     backgroundColor: "#f8f9fa",
   },
-  searchContainer: {
+  headerSection: {
     marginBottom: 16,
+  },
+  searchContainer: {
     flexDirection: "row",
     alignItems: "center",
     position: "relative",
     backgroundColor: "#fff",
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#dee2e6",
+    borderRadius: 14,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
+    shadowOpacity: 0.08,
     shadowRadius: 3,
     elevation: 2,
+    marginBottom: 12,
   },
   searchIcon: {
     position: "absolute",
     left: 16,
-    fontSize: 16,
+    fontSize: 20,
     zIndex: 1,
-    color: "#adb5bd",
+    color: "#6c757d",
+    fontWeight: "400",
   },
   searchInput: {
     flex: 1,
-    padding: 15,
-    paddingLeft: 42,
-    fontSize: 15,
-    borderRightWidth: 1,
-    borderRightColor: "#f1f3f5",
+    paddingVertical: 16,
+    paddingLeft: 44,
+    paddingRight: 44,
+    fontSize: 16,
+    color: "#212529",
   },
-  segmentedControl: {
+  searchClearButton: {
+    position: "absolute",
+    right: 12,
+    top: "50%",
+    transform: [{ translateY: -12 }],
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: "#e9ecef",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  searchClearText: {
+    fontSize: 12,
+    color: "#6c757d",
+    fontWeight: "700",
+    lineHeight: 14,
+  },
+  filterContainer: {
     flexDirection: "row",
-    paddingLeft: 8,
-    paddingRight: 8,
+    backgroundColor: "#f8f9fa",
+    borderRadius: 12,
+    padding: 4,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 2,
+    elevation: 1,
   },
   segmentButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 10,
+    flex: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
     alignItems: "center",
+    borderRadius: 8,
+    marginHorizontal: 2,
   },
   activeSegment: {
-    borderBottomWidth: 2,
-    borderBottomColor: "#4dabf7",
-  },
-  segmentText: {
-    fontSize: 13,
-    color: "#868e96",
-  },
-  activeSegmentText: {
-    fontWeight: "600",
-    color: "#343a40",
-  },
-  historyContainer: {
-    marginBottom: 16,
-  },
-  historyContentContainer: {
-    paddingRight: 12,
-  },
-  historyItem: {
-    backgroundColor: "#e9ecef",
-    borderRadius: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    marginRight: 8,
-    borderWidth: 1,
-    borderColor: "#dee2e6",
-  },
-  historyText: {
-    fontSize: 14,
-    color: "#495057",
-  },
-  gridRow: {
-    justifyContent: "space-between",
-    marginBottom: CARD_MARGIN,
-  },
-  memoCard: {
-    width: CARD_WIDTH,
-    aspectRatio: 1,
-    borderRadius: 12,
     backgroundColor: "#fff",
-    padding: 12,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 3,
     elevation: 2,
-    borderWidth: 1,
-    borderColor: "#e9ecef",
   },
-  cardHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 8,
+  segmentText: {
+    fontSize: 15,
+    color: "#6c757d",
+    fontWeight: "500",
   },
-  cardContent: {
-    flex: 1,
-    justifyContent: "space-between",
+  activeSegmentText: {
+    fontWeight: "700",
+    color: "#339af0",
   },
-  memoTitle: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#212529",
+  favoriteSegmentActive: {
+    color: "#ff8f00",
+  },
+  historySection: {
+    marginBottom: 20,
+  },
+  historyContainer: {
     marginBottom: 4,
   },
+  historyContentContainer: {
+    paddingRight: 12,
+  },
+  historyItemContainer: {
+    position: "relative",
+    marginRight: 10,
+  },
+  historyItem: {
+    backgroundColor: "#fff",
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    paddingRight: 36,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 2,
+    elevation: 1,
+    borderWidth: 1,
+    borderColor: "#f1f3f5",
+  },
+  historyDeleteButton: {
+    position: "absolute",
+    right: 2,
+    top: 2,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: "#6c757d",
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 1,
+    elevation: 2,
+  },
+  historyDeleteText: {
+    fontSize: 12,
+    color: "#fff",
+    fontWeight: "700",
+    lineHeight: 14,
+  },
+  historyText: {
+    fontSize: 14,
+    color: "#495057",
+    fontWeight: "500",
+  },
+  contentSection: {
+    flex: 1,
+  },
+  memoCard: {
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    marginBottom: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  cardContent: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    padding: 16,
+  },
+  textContent: {
+    flex: 1,
+    marginRight: 12,
+  },
+  cardActions: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+  },
+  memoTitle: {
+    fontSize: 17,
+    fontWeight: "700",
+    color: "#212529",
+    marginBottom: 6,
+    letterSpacing: -0.2,
+  },
   memoSummary: {
-    fontSize: 13,
+    fontSize: 14,
     color: "#6c757d",
-    lineHeight: 18,
+    lineHeight: 20,
+    marginBottom: 4,
   },
   memoDate: {
-    fontSize: 10,
-    color: "#868e96",
+    fontSize: 12,
+    color: "#adb5bd",
     marginTop: 4,
   },
   closeButton: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+    width: 32,
+    height: 32,
+    borderRadius: 10,
     backgroundColor: "#f8f9fa",
     alignItems: "center",
     justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 1,
+    elevation: 1,
   },
   closeButtonText: {
-    fontSize: 14,
+    fontSize: 16,
     color: "#868e96",
-    fontWeight: "bold",
+    fontWeight: "600",
   },
   favoriteButton: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+    width: 32,
+    height: 32,
+    borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
+    backgroundColor: "#f8f9fa",
+    marginRight: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 1,
+    elevation: 1,
   },
   favoriteIcon: {
-    fontSize: 18,
+    fontSize: 16,
+    color: "#495057",
+    fontWeight: "600",
+  },
+  favoriteActiveIcon: {
+    color: "#ff8f00",
+  },
+  favoriteActiveButton: {
+    backgroundColor: "#fff3cd",
+    borderWidth: 1,
+    borderColor: "#ffc107",
   },
   emptyContainer: {
-    padding: 24,
+    paddingVertical: 32,
+    paddingHorizontal: 24,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "#fff",
-    borderRadius: 12,
-    marginTop: 16,
+    borderRadius: 14,
+    marginTop: 12,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 3,
+    elevation: 1,
   },
   emptyText: {
-    fontSize: 16,
-    color: "#868e96",
+    fontSize: 17,
+    color: "#6c757d",
     textAlign: "center",
+    fontWeight: "600",
+    marginBottom: 4,
   },
   listContentContainer: {
-    paddingBottom: 80,
+    paddingBottom: 100,
+    flexGrow: 1,
   },
   addButton: {
     position: "absolute",
     bottom: 24,
     right: 24,
-    backgroundColor: "#4dabf7",
+    backgroundColor: "#339af0",
     borderRadius: 30,
     width: 60,
     height: 60,
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
+    shadowColor: "#339af0",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
     shadowRadius: 4,
-    elevation: 4,
+    elevation: 5,
   },
   addButtonText: {
     color: "#fff",
@@ -649,21 +798,23 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   itemsPreview: {
-    marginTop: 2,
+    marginTop: 4,
+    marginBottom: 6,
   },
   previewItem: {
-    fontSize: 12,
+    fontSize: 13,
     color: "#495057",
-    marginBottom: 1,
+    marginBottom: 2,
+    lineHeight: 18,
   },
   checkedItem: {
     textDecorationLine: "line-through",
     color: "#adb5bd",
   },
   moreItems: {
-    fontSize: 11,
+    fontSize: 12,
     color: "#adb5bd",
-    fontStyle: "italic",
+    fontWeight: "500",
     marginTop: 2,
   },
   menuOverlay: {
@@ -793,12 +944,15 @@ const styles = StyleSheet.create({
     width: "100%",
   },
   emptyIcon: {
-    fontSize: 24,
-    marginBottom: 8,
+    fontSize: 32,
+    marginBottom: 12,
+    color: "#dee2e6",
   },
   emptySubtext: {
-    fontSize: 12,
-    color: "#868e96",
+    fontSize: 14,
+    color: "#adb5bd",
     textAlign: "center",
+    lineHeight: 20,
+    marginTop: 4,
   },
 });
