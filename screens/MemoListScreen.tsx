@@ -23,9 +23,9 @@ import {
   Share,
   ToastAndroid,
   Platform,
-  TouchableWithoutFeedback,
   Keyboard,
   ScrollView,
+  KeyboardAvoidingView,
 } from "react-native";
 import * as Clipboard from "expo-clipboard";
 import {
@@ -35,7 +35,7 @@ import {
   useFocusEffect,
 } from "@react-navigation/native";
 import { MemoContext, Memo } from "../context/MemoContext";
-import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
+// import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import {
   GestureHandlerRootView,
@@ -602,7 +602,10 @@ const MemoFooter = ({
           {filteredSuggestions.map((suggestion) => (
             <TouchableOpacity
               key={suggestion}
-              onPress={() => setInput(suggestion)}
+              onPress={() => {
+                setInput(suggestion);
+                // 자동으로 항목 추가하지 않고 사용자가 직접 추가 버튼을 누르도록 함
+              }}
               style={styles.suggestionItem}
             >
               <Text style={styles.suggestionText}>{suggestion}</Text>
@@ -741,8 +744,8 @@ const MemoListScreen = () => {
     currentMemo?.items.filter((item) => !item.checked) || [];
   const checkedItems = currentMemo?.items.filter((item) => item.checked) || [];
 
-  // 완료된 항목 표시 여부
-  const [showCompletedItems, setShowCompletedItems] = useState(true);
+  // 완료된 항목 표시 여부 (기본적으로 숨김)
+  const [showCompletedItems, setShowCompletedItems] = useState(false);
 
   // 애니메이션 값 - 새 항목 추가 시 페이드인 효과용
   const [fadeAnim] = useState(new Animated.Value(1));
@@ -909,6 +912,18 @@ const MemoListScreen = () => {
   const addNewItem = (text: string) => {
     if (!text.trim()) return;
 
+    if (!currentMemo) {
+      if (Platform.OS === "android") {
+        ToastAndroid.show("메모를 찾을 수 없습니다", ToastAndroid.SHORT);
+      }
+      return;
+    }
+
+    // 현재 텍스트를 로컬 변수에 저장 (상태 업데이트 동기화 문제 방지)
+    const itemText = text.trim();
+
+    // 중복 항목 허용 - 동일한 이름의 항목도 추가 가능
+
     // 입력 필드 비우기
     setNewItemText("");
 
@@ -916,7 +931,7 @@ const MemoListScreen = () => {
     fadeAnim.setValue(0);
 
     // 직접 항목 추가
-    addItemToMemo(memoId, text.trim());
+    addItemToMemo(memoId, itemText);
 
     // 성공 피드백
     if (Platform.OS === "android") {
@@ -926,7 +941,12 @@ const MemoListScreen = () => {
     // 애니메이션 실행
     fadeIn();
 
-    // 키보드 유지 (사용자가 연속해서 항목을 추가할 수 있도록)
+    // 포커스 유지 - 연속 입력을 위해 다시 포커스 설정
+    requestAnimationFrame(() => {
+      if (memoInputRef.current) {
+        memoInputRef.current.focus();
+      }
+    });
   };
 
   // 텍스트를 항목으로 처리하는 함수
@@ -941,23 +961,17 @@ const MemoListScreen = () => {
     // 하나의 항목만 있는 경우 (간단한 경우)
     if (filteredLines.length === 1) {
       const itemText = filteredLines[0].trim();
-      // 이미 존재하는 항목인지 확인
-      const alreadyExists = currentMemo?.items.some(
-        (item) => item.name === itemText && !item.checked
-      );
+      
+      // 중복 허용 - 모든 항목 추가
+      addItemToMemo(memoId, itemText);
 
-      // 존재하지 않는 항목만 추가
-      if (!alreadyExists) {
-        addItemToMemo(memoId, itemText);
+      // 애니메이션 실행
+      fadeAnim.setValue(0);
+      fadeIn();
 
-        // 애니메이션 실행
-        fadeAnim.setValue(0);
-        fadeIn();
-
-        // 성공 피드백
-        if (Platform.OS === "android") {
-          ToastAndroid.show("항목이 추가되었습니다", ToastAndroid.SHORT);
-        }
+      // 성공 피드백
+      if (Platform.OS === "android") {
+        ToastAndroid.show("항목이 추가되었습니다", ToastAndroid.SHORT);
       }
 
       // 추천 항목 초기화
@@ -971,16 +985,9 @@ const MemoListScreen = () => {
       const itemText = line.trim();
       if (!itemText) return;
 
-      // 이미 존재하는 항목인지 확인
-      const alreadyExists = currentMemo?.items.some(
-        (item) => item.name === itemText && !item.checked
-      );
-
-      // 존재하지 않는 항목만 추가
-      if (!alreadyExists) {
-        addItemToMemo(memoId, itemText);
-        addedCount++;
-      }
+      // 중복 허용 - 모든 항목 추가
+      addItemToMemo(memoId, itemText);
+      addedCount++;
     });
 
     // 성공 피드백 - 항목이 추가되었음을 알리는 간단한 알림
@@ -1122,69 +1129,116 @@ const MemoListScreen = () => {
     startItemEdit(item);
   };
 
-  // 단순한 항목 컴포넌트
+  // 스와이프 삭제 액션 렌더링
+  const renderRightActions = (item) => {
+    return (
+      <View style={styles.swipeDeleteAction}>
+        <Text style={styles.swipeDeleteText}>삭제</Text>
+      </View>
+    );
+  };
+
+  // 스와이프 상태 관리
+  const [swipingItemId, setSwipingItemId] = useState(null);
+
+  // 단순한 항목 컴포넌트 (완료/미완료 모두 스와이프 삭제 통일)
   const TouchableItem = ({ item, index, isChecked = false }) => {
     return (
-      <TouchableOpacity
-        style={[isChecked ? styles.checkedItemRow : styles.itemRow]}
-        onPress={() => startItemEdit(item)}
-        onLongPress={() => onLongPress(index, item)}
-        delayLongPress={500}
-        activeOpacity={0.7}
+      <Swipeable
+        renderRightActions={() => renderRightActions(item)}
+        rightThreshold={100}
+        onSwipeableWillOpen={() => {
+          // 스와이프가 시작되면 해당 항목 ID 저장
+          setSwipingItemId(item.id);
+        }}
+        onSwipeableOpen={(direction) => {
+          if (direction === 'right') {
+            // 스와이프하면 자동으로 삭제
+            deleteItemFromMemo(memoId, item.id);
+            
+            // 삭제 피드백
+            if (Platform.OS === "android") {
+              ToastAndroid.show("항목이 삭제되었습니다", ToastAndroid.SHORT);
+            }
+          }
+          // 스와이프 상태 초기화
+          setSwipingItemId(null);
+        }}
+        onSwipeableClose={() => {
+          // 스와이프가 닫히면 상태 초기화
+          setSwipingItemId(null);
+        }}
       >
         <TouchableOpacity
+          style={isChecked ? styles.checkedItemRow : styles.itemRow}
           onPress={() => {
-            // 편집 중인 항목이면 편집 모드를 종료
-            if (editingItemId === item.id) {
-              setEditingItemId(null);
-              setEditingItemText("");
-              Keyboard.dismiss();
+            // 스와이프 중이면 편집 비활성화
+            if (swipingItemId === item.id) {
+              return;
             }
-
-            // 체크 상태 변경
-            isChecked
-              ? toggleItemChecked(memoId, item.id)
-              : handleItemCheck(item.id);
+            startItemEdit(item);
           }}
-          style={styles.checkboxTouchable}
+          onLongPress={() => {
+            // 스와이프 중이면 롱프레스 비활성화
+            if (swipingItemId === item.id) {
+              return;
+            }
+            onLongPress(index, item);
+          }}
+          delayLongPress={500}
+          activeOpacity={swipingItemId === item.id ? 1 : 0.7}
         >
-          <View style={[styles.checkbox, isChecked && styles.checkboxChecked]}>
-            {isChecked && <Text style={styles.checkmark}>✓</Text>}
-          </View>
-        </TouchableOpacity>
-
-        {editingItemId === item.id ? (
-          <TextInput
-            style={[styles.itemText, styles.itemEditInput]}
-            value={editingItemText}
-            onChangeText={setEditingItemText}
-            onSubmitEditing={finishItemEdit}
-            onBlur={finishItemEdit}
-            autoFocus
-            blurOnSubmit={true}
-            keyboardType="default"
-          />
-        ) : (
-          <Text style={[styles.itemText, isChecked && styles.checkedText]}>
-            {item.name}
-          </Text>
-        )}
-
-        {isChecked && (
           <TouchableOpacity
-            onPress={() => deleteItemFromMemo(memoId, item.id)}
-            style={styles.deleteButton}
+            onPress={() => {
+              // 스와이프 중이면 체크 비활성화
+              if (swipingItemId === item.id) {
+                return;
+              }
+              
+              // 편집 중인 항목이면 편집 모드를 종료
+              if (editingItemId === item.id) {
+                setEditingItemId(null);
+                setEditingItemText("");
+                Keyboard.dismiss();
+              }
+
+              // 체크 상태 변경
+              if (isChecked) {
+                toggleItemChecked(memoId, item.id);
+              } else {
+                handleItemCheck(item.id);
+              }
+            }}
+            style={styles.checkboxTouchable}
           >
-            <Text style={styles.deleteText}>✕</Text>
+            <View style={[styles.checkbox, isChecked && styles.checkboxChecked]}>
+              {isChecked && <Text style={styles.checkmark}>✓</Text>}
+            </View>
           </TouchableOpacity>
-        )}
-      </TouchableOpacity>
+
+          {editingItemId === item.id ? (
+            <TextInput
+              style={[styles.itemText, styles.itemEditInput]}
+              value={editingItemText}
+              onChangeText={setEditingItemText}
+              onSubmitEditing={finishItemEdit}
+              onBlur={finishItemEdit}
+              autoFocus
+              blurOnSubmit={true}
+              keyboardType="default"
+            />
+          ) : (
+            <Text style={[styles.itemText, isChecked && styles.checkedText]}>
+              {item.name}
+            </Text>
+          )}
+        </TouchableOpacity>
+      </Swipeable>
     );
   };
 
   return (
-    <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
-      <View style={styles.container}>
+    <View style={styles.container}>
         <View style={styles.titleContainer}>
           <View style={styles.titleRow}>
             {editingTitle ? (
@@ -1231,21 +1285,20 @@ const MemoListScreen = () => {
           </View>
         </View>
 
-        <KeyboardAwareScrollView
-          style={styles.mainScrollView}
-          contentContainerStyle={styles.mainScrollContentContainer}
-          showsVerticalScrollIndicator={true}
-          enableOnAndroid={true}
-          enableAutomaticScroll={true}
-          keyboardShouldPersistTaps="handled"
-          extraScrollHeight={50}
-          scrollEnabled={true}
-          bounces={true}
-          bouncesZoom={false}
-          alwaysBounceVertical={false}
-          automaticallyAdjustContentInsets={false}
-          keyboardOpeningTime={0}
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
         >
+          <ScrollView
+            style={styles.mainScrollView}
+            contentContainerStyle={styles.mainScrollContentContainer}
+            showsVerticalScrollIndicator={true}
+            keyboardShouldPersistTaps="always"
+            scrollEnabled={true}
+            bounces={true}
+            automaticallyAdjustContentInsets={false}
+          >
           {/* 새 항목 입력 영역을 상단에 배치 */}
           <View style={styles.newItemContainer}>
             <View style={styles.newItemInputRow}>
@@ -1255,22 +1308,28 @@ const MemoListScreen = () => {
               <TextInput
                 ref={memoInputRef}
                 style={styles.itemInputField}
-                multiline
+                multiline={false}
                 value={newItemText}
                 onChangeText={handleNewItemTextChange}
-                onKeyPress={({ nativeEvent }) => {
-                  if (nativeEvent.key === "Enter") {
-                    // Enter 키 처리
-                    if (newItemText.trim()) {
-                      addNewItem(newItemText);
-                    } else {
-                      setNewItemText("");
-                    }
+                onSubmitEditing={() => {
+                  // Enter 키 처리 - 중복 실행 방지
+                  if (newItemText.trim()) {
+                    addNewItem(newItemText);
+                  } else {
+                    // 빈 텍스트인 경우에도 포커스 유지
+                    requestAnimationFrame(() => {
+                      if (memoInputRef.current) {
+                        memoInputRef.current.focus();
+                      }
+                    });
                   }
                 }}
                 placeholder="Add new task..."
                 autoCapitalize="none"
+                autoFocus={false}
                 blurOnSubmit={false}
+                returnKeyType="done"
+                selectTextOnFocus={false}
               />
               <TouchableOpacity
                 style={styles.addItemButton}
@@ -1292,7 +1351,7 @@ const MemoListScreen = () => {
                     key={index}
                     style={styles.suggestionItem}
                     onPress={() => {
-                      setNewItemText(suggestion);
+                      // 중복 입력 방지: 직접 addNewItem 호출
                       addNewItem(suggestion);
                     }}
                   >
@@ -1359,11 +1418,11 @@ const MemoListScreen = () => {
               )}
             </>
           )}
-        </KeyboardAwareScrollView>
+          </ScrollView>
+        </KeyboardAvoidingView>
       </View>
-    </TouchableWithoutFeedback>
-  );
-};
+    );
+  };
 
 export default MemoListScreen;
 
@@ -2005,14 +2064,15 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 14,
     backgroundColor: "#f8f9fa",
-    marginVertical: 3,
+    marginVertical: 5,
     marginHorizontal: 10,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: "#e9ecef",
+    borderRadius: 10,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 1,
+    elevation: 1,
     minHeight: 40,
-    justifyContent: "space-between",
-    width: "100%",
   },
   uncheckedItemRow: {
     flexDirection: "row",
@@ -2261,5 +2321,24 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 1,
     elevation: 1,
+  },
+  swipeDeleteAction: {
+    backgroundColor: "#ff6b6b",
+    justifyContent: "center",
+    alignItems: "center",
+    width: 80,
+    marginVertical: 5,
+    marginHorizontal: 10,
+    borderRadius: 10,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 1,
+    elevation: 1,
+  },
+  swipeDeleteText: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "bold",
   },
 });
