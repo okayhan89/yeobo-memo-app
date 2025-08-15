@@ -3,6 +3,7 @@ import uuid from "react-native-uuid";
 import * as Clipboard from "expo-clipboard";
 import { Alert } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import WidgetManager from "../utils/WidgetManager";
 
 export interface MemoItem {
   id: string;
@@ -35,6 +36,10 @@ export interface MemoContextType {
   shareMemo: (memoId: string) => void;
   getMemoText: (memoId: string) => string;
   restoreMemo: (memo: Memo) => void;
+  // 위젯 관련 기능
+  createWidgetForMemo: (memoId: string) => Promise<boolean>;
+  getWidgetCountForMemo: (memoId: string) => Promise<number>;
+  refreshAllWidgets: () => Promise<void>;
 }
 
 export const MemoContext = createContext<MemoContextType>(
@@ -110,6 +115,66 @@ export const MemoProvider: React.FC<{ children: React.ReactNode }> = ({
   const restoreMemo = (memo) => {
     setMemos((prev) => [...prev, memo]);
   };
+
+  // 🔗 위젯 관련 함수들
+  const createWidgetForMemo = async (memoId: string): Promise<boolean> => {
+    const memo = memos.find(m => m.id === memoId);
+    if (!memo) {
+      Alert.alert("오류", "메모를 찾을 수 없습니다.");
+      return false;
+    }
+
+    try {
+      const widgetId = await WidgetManager.createWidgetForMemo(memo);
+      if (widgetId) {
+        Alert.alert(
+          "위젯 생성 완료", 
+          `"${memo.title || '제목 없음'}" 메모의 위젯이 생성되었습니다.\n\n홈 화면에서 위젯을 추가해보세요!`,
+          [{ text: "확인" }]
+        );
+        return true;
+      } else {
+        Alert.alert("오류", "위젯 생성에 실패했습니다.");
+        return false;
+      }
+    } catch (error) {
+      console.error("위젯 생성 오류:", error);
+      Alert.alert("오류", "위젯 생성 중 오류가 발생했습니다.");
+      return false;
+    }
+  };
+
+  const getWidgetCountForMemo = async (memoId: string): Promise<number> => {
+    try {
+      return await WidgetManager.getWidgetCountForMemo(memoId);
+    } catch (error) {
+      console.error("위젯 개수 확인 오류:", error);
+      return 0;
+    }
+  };
+
+  const refreshAllWidgets = async (): Promise<void> => {
+    try {
+      await WidgetManager.refreshAllWidgets(memos);
+    } catch (error) {
+      console.error("위젯 새로고침 오류:", error);
+    }
+  };
+
+  // 메모 변경 시 위젯 자동 업데이트
+  useEffect(() => {
+    const updateWidgets = async () => {
+      try {
+        await WidgetManager.refreshAllWidgets(memos);
+      } catch (error) {
+        console.error("위젯 자동 업데이트 오류:", error);
+      }
+    };
+
+    if (memos.length > 0) {
+      updateWidgets();
+    }
+  }, [memos]);
 
   const addItemToMemo = (memoId, itemName) => {
     setMemos((prevMemos) =>
@@ -280,6 +345,9 @@ export const MemoProvider: React.FC<{ children: React.ReactNode }> = ({
         shareMemo,
         getMemoText,
         restoreMemo,
+        createWidgetForMemo,
+        getWidgetCountForMemo,
+        refreshAllWidgets,
       }}
     >
       {children}

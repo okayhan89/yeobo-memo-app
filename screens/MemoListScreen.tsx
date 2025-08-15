@@ -726,6 +726,8 @@ const MemoListScreen = () => {
     renameMemo,
     toggleFavorite,
     deleteMemo,
+    createWidgetForMemo,
+    getWidgetCountForMemo,
   } = useContext(MemoContext);
 
   const [editingTitle, setEditingTitle] = useState(false);
@@ -739,6 +741,7 @@ const MemoListScreen = () => {
 
   const currentMemo = memos.find((memo) => memo.id === memoId);
   const [isFavorite, setIsFavorite] = useState(currentMemo?.favorite || false);
+  const [widgetCount, setWidgetCount] = useState(0);
 
   // 체크된 항목과 체크되지 않은 항목을 분리
   const uncheckedItems =
@@ -797,6 +800,17 @@ const MemoListScreen = () => {
       initialFocusApplied.current = true;
     }
   }, [currentMemo]);
+
+  // 위젯 개수 로드
+  useEffect(() => {
+    const loadWidgetCount = async () => {
+      if (currentMemo) {
+        const count = await getWidgetCountForMemo(currentMemo.id);
+        setWidgetCount(count);
+      }
+    };
+    loadWidgetCount();
+  }, [currentMemo, getWidgetCountForMemo]);
 
   // 키보드 표시/숨김 이벤트 리스너
   useEffect(() => {
@@ -865,6 +879,17 @@ const MemoListScreen = () => {
           memoInputRef.current.focus();
         }
       }, 100);
+    }
+  };
+
+  const handleCreateWidget = async () => {
+    if (currentMemo) {
+      const success = await createWidgetForMemo(currentMemo.id);
+      if (success) {
+        // 위젯 개수 업데이트
+        const newCount = await getWidgetCountForMemo(currentMemo.id);
+        setWidgetCount(newCount);
+      }
     }
   };
 
@@ -1269,6 +1294,23 @@ const MemoListScreen = () => {
             )}
 
             <View style={styles.titleActions}>
+              <TouchableOpacity
+                onPress={handleCreateWidget}
+                style={[
+                  styles.titleActionButton,
+                  widgetCount > 0 && styles.widgetActiveButton
+                ]}
+              >
+                <Text style={[
+                  styles.titleActionIcon,
+                  widgetCount > 0 && styles.widgetActiveIcon
+                ]}>
+                  📱
+                </Text>
+                {widgetCount > 0 && (
+                  <Text style={styles.widgetCountBadge}>{widgetCount}</Text>
+                )}
+              </TouchableOpacity>
               <TouchableOpacity
                 onPress={handleToggleFavorite}
                 style={[
@@ -2047,6 +2089,29 @@ const styles = StyleSheet.create({
   },
   favoriteActiveIcon: {
     color: "#ff8f00",
+  },
+  widgetActiveButton: {
+    backgroundColor: "#e3f2fd",
+    borderWidth: 1,
+    borderColor: "#339af0",
+    position: "relative",
+  },
+  widgetActiveIcon: {
+    color: "#339af0",
+  },
+  widgetCountBadge: {
+    position: "absolute",
+    top: -4,
+    right: -4,
+    backgroundColor: "#339af0",
+    color: "#fff",
+    fontSize: 10,
+    fontWeight: "700",
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    borderRadius: 8,
+    minWidth: 16,
+    textAlign: "center",
   },
   scrollContainer: {
     flex: 1,
